@@ -148,6 +148,14 @@ describe("decideSanitize (pure)", () => {
     );
     expect(d.action).toBe("block");
   });
+
+  test("ignores noul answers outside the hazard battery", () => {
+    const d = decideSanitize(
+      sanitizeScript({ on_task: noulAnswer(0.95) })(),
+      POLICY,
+    );
+    expect(d.action).toBe("pass");
+  });
 });
 
 describe("ReflexEngine", () => {
@@ -171,6 +179,14 @@ describe("ReflexEngine", () => {
     expect(mock.calls).toHaveLength(0);
     const events = loadJournal(journalPath);
     expect(events.map((e) => e.t)).toEqual(["decision"]);
+  });
+
+  test("write to a secrets path is denied by floor without Jev", async () => {
+    const { engine, mock } = engineWith(gateScript({}));
+    const decision = await engine.gate({ tool: "write", command: "write file .env", task: "x", path: ".env" });
+
+    expect(decision.action).toBe("deny");
+    expect(mock.calls).toHaveLength(0);
   });
 
   test("static floor ask escalates a Jev auto verdict", async () => {

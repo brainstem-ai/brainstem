@@ -1,0 +1,158 @@
+import { Type } from "@sinclair/typebox";
+import { spawn } from "node:child_process";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+
+const OUTPUT_CAP = 50_000;
+const READ_CAP = 100_000;
+
+export interface ToolDeps {
+  cwd: string;
+}
+
+function cap(text: string, limit: number): string {
+  return text.length > limit ? `${text.slice(0, limit)}\n... (truncated)` : text;
+}
+
+function globToRegex(pattern: string): RegExp {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*/g, "\0DOUBLESTAR\0")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\?/g, "[^/]")
+    .replace(/\0DOUBLESTAR\0/g, ".*");
+  return new RegExp(`^${escaped}$`);
+}
+
+export function makeTools(deps: ToolDeps): AgentTool[] {
+  const bash: AgentTool = {
+    name: "bash",
+    label: "Bash",
+    description: "Run a shell command in the project directory and return its output.",
+    parameters: Type.Object({
+      command: Type.String({ description: "The shell command to run" }),
+      timeout_ms: Type.Optional(Type.Number({ description: "Timeout in milliseconds (default 60000)" })),
+    }),
+    execute: async (_id, params, signal) => {
+      const timeout = AbortSignal.timeout(params.timeout_ms ?? 60_000);
+      const child = spawn("/bin/bash", ["-lc", params.command], {
+        cwd: deps.cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+        signal: signal ?? timeout,
+      });
+      const [stdout, stderr, code] = await Promise.all([
+        new Promise<string>((resolve) => { child.stdout!.on("data", (d) => resolve(String(d))); child.stdout!.on("end", () => resolve("")); }),
+        new Promise<string>((resolve) => { child.stderr!.on("data", (d) => resolve(String(d))); child.stderr!.on("end", () => resolve("")); }),
+        new Promise<number>((resolve) => child.on("close", (c) => resolve(c ?? -1))),
+      ]);
+      const output = cap(`${stdout}${stderr}`.trim(), OUTPUT_CAP);
+      if (code !== 0) {
+        throw new Error(`exit ${code}: ${output}`);
+      }
+      return { content: [{ type: "text", text: output || "(no output)" }], details: { exit: code } };
+    },
+  };
+
+  const read: AgentTool = {
+    name: "read",
+    label: "Read File",
+    description: "Read a file's contents.",
+    parameters: Type.Object({
+      path: Type.String({ description: "File path, relative to the project directory" }),
+    }),
+    execute: async (_id, params) => {
+      const path = join(deps.cwd, params.path);
+      const text = readFileSync(path, "utf8");
+      return { content: [{ type: "text", text: cap(text, READ_CAP) }], details: { path: params.path } };
+    },
+  };
+
+  const write: AgentTool = {
+    name: "write",
+    label: "Write File",
+    description: "Create or overwrite a file with the given content.",
+    parameters: Type.Object({
+      path: Type.String({ description: "File path, relative to the project directory" }),
+      content: Type.String({ description: "Full file content to write" }),
+    }),
+    execute: async (_id, params) => {
+      const path = join(deps.cwd, params.path);
+      mkdirSync(join(path, ".."), { recursive: true });
+      writeFileSync(path, params.content, "utf8");
+      return {
+        content: [{ type: "text", text: `wrote ${params.path} (${params.content.length} bytes)` }],
+        details: { path: params.path, bytes: params.content.length },
+      };
+    },
+  };
+
+  function* walk(dir: string): Generator<string> {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) yield* walk(full);
+      else if (statSync(full).size < 1_000_000) yield full;
+    }
+  }
+
+  const grep: AgentTool = {
+    name: "grep",
+    label: "Grep",
+    description: "Search file contents with a regular expression.",
+    parameters: Type.Object({
+      pattern: Type.String({ description: "Regular expression to search for" }),
+      path: Type.Optional(Type.String({ description: "Directory to search (default: project root)" })),
+    }),
+    execute: async (_id, params) => {
+      const base = join(deps.cwd, params.path ?? ".");
+      const re = new RegExp(params.pattern);
+      const matches: string[] = [];
+      for (const file of walk(base)) {
+        if (matches.length >= 200) break;
+        let lines: string[];
+        try {
+          lines = readFileSync(file, "utf8").split("\n");
+        } catch {
+          continue;
+        }
+        for (let i = 0; i < lines.length; i++) {
+          if (re.test(lines[i]!)) {
+            matches.push(`${relative(deps.cwd, file)}:${i + 1}: ${lines[i]!.trim()}`);
+            if (matches.length >= 200) break;
+          }
+        }
+      }
+      return {
+        content: [{ type: "text", text: matches.length > 0 ? matches.join("\n") : "(no matches)" }],
+        details: { count: matches.length },
+      };
+    },
+  };
+
+  const glob: AgentTool = {
+    name: "glob",
+    label: "Glob",
+    description: "List files matching a glob pattern.",
+    parameters: Type.Object({
+      pattern: Type.String({ description: "Glob pattern, e.g. src/**/*.ts" }),
+    }),
+    execute: async (_id, params) => {
+      const re = globToRegex(params.pattern);
+      const files: string[] = [];
+      for (const path of walk(deps.cwd)) {
+        const rel = relative(deps.cwd, path);
+        if (re.test(rel)) {
+          files.push(rel);
+          if (files.length >= 500) break;
+        }
+      }
+      return {
+        content: [{ type: "text", text: files.length > 0 ? files.sort().join("\n") : "(no matches)" }],
+        details: { count: files.length },
+      };
+    },
+  };
+
+  return [bash, read, write, grep, glob];
+}

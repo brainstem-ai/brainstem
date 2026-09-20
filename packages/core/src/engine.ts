@@ -15,6 +15,7 @@ export interface GateInput {
   tool: string;
   command: string;
   task: string;
+  path?: string;
 }
 
 export type SanitizeAction = "pass" | "review" | "block";
@@ -80,11 +81,14 @@ export function decideGate(answers: Record<string, Answer>, policy: Policy): Gat
   return { action: "auto", reasons };
 }
 
+const SANITIZE_HAZARDS = ["contains_agent_directive", "tries_to_override", "requests_dangerous_action"] as const;
+
 export function decideSanitize(answers: Record<string, Answer>, policy: Policy): SanitizeDecision {
   const reasons: string[] = [];
   const nouls: [string, number][] = [];
-  for (const [id, answer] of Object.entries(answers)) {
-    if (answer.type === "noul") nouls.push([id, answer.noul]);
+  for (const id of SANITIZE_HAZARDS) {
+    const answer = answers[id];
+    if (answer?.type === "noul") nouls.push([id, answer.noul]);
   }
   const severity = answers.severity?.type === "score" ? answers.severity.score : 0;
 
@@ -125,7 +129,7 @@ export class ReflexEngine {
   }
 
   async gate(input: GateInput): Promise<GateDecision & { result?: AskResult }> {
-    const floor = staticVerdict(input.tool, { command: input.command });
+    const floor = staticVerdict(input.tool, { command: input.command, path: input.path });
 
     if (floor === "deny") {
       const decision: GateDecision = { action: "deny", reasons: ["static floor: dangerous pattern"] };
