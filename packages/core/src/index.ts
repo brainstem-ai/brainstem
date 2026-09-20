@@ -12,3 +12,8 @@ export type { MockSystemOne } from "./providers/mock";
 export { openJournal, appendJournalEvent, loadJournal } from "./journal";
 export type { Journal, JournalEvent } from "./journal";
 export { gateQuestions, sanitizeQuestions, GATE_DISPOSITION_CRITERIA, SANITIZE_SEVERITY_LEVELS } from "./questions";
+export { policyForTrust, DEFAULT_TRUST } from "./policy";
+export type { Policy } from "./policy";
+export { staticVerdict } from "./floor";
+export { ReflexEngine, decideGate, decideSanitize } from "./engine";
+export type { GateDecision, GateInput, GateAction, SanitizeDecision, SanitizeAction } from "./engine";
