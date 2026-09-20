@@ -48,6 +48,20 @@ export interface SystemOne {
   ask(state: unknown, questions: Record<string, Question>): Promise<AskResult>;
 }
 
+export function noul(instructions: string, criteria?: { true: string; false: string }): NoulQuestion {
+  const question: NoulQuestion = { type: "noul", instructions };
+  if (criteria) question.criteria = criteria;
+  return question;
+}
+
+export function choice(instructions: string, criteria: Record<string, string>): ChoiceQuestion {
+  return { type: "choice", instructions, criteria };
+}
+
+export function score(instructions: string, criteria: [string, ...string[]]): ScoreQuestion {
+  return { type: "score", instructions, criteria };
+}
+
 export interface AskCall {
   state: unknown;
   questions: Record<string, Question>;
