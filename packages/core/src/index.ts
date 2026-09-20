@@ -6,3 +6,4 @@ export { mockSystemOne, noulAnswer, choiceAnswer, scoreAnswer } from "./provider
 export type { MockSystemOne } from "./providers/mock";
 export { openJournal, appendJournalEvent, loadJournal } from "./journal";
 export type { Journal, JournalEvent } from "./journal";
+export { gateQuestions, sanitizeQuestions, GATE_DISPOSITION_CRITERIA, SANITIZE_SEVERITY_LEVELS } from "./questions";
