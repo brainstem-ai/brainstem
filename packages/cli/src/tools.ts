@@ -26,14 +26,15 @@ function globToRegex(pattern: string): RegExp {
 }
 
 export function makeTools(deps: ToolDeps): AgentTool[] {
-  const bash: AgentTool = {
+  const bashParams = Type.Object({
+      command: Type.String({ description: "The shell command to run" }),
+      timeout_ms: Type.Optional(Type.Number({ description: "Timeout in milliseconds (default 60000)" })),
+    });
+  const bash: AgentTool<typeof bashParams> = {
     name: "bash",
     label: "Bash",
     description: "Run a shell command in the project directory and return its output.",
-    parameters: Type.Object({
-      command: Type.String({ description: "The shell command to run" }),
-      timeout_ms: Type.Optional(Type.Number({ description: "Timeout in milliseconds (default 60000)" })),
-    }),
+    parameters: bashParams,
     execute: async (_id, params, signal) => {
       const timeout = AbortSignal.timeout(params.timeout_ms ?? 60_000);
       const child = spawn("/bin/bash", ["-lc", params.command], {
@@ -54,13 +55,14 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     },
   };
 
-  const read: AgentTool = {
+  const readParams = Type.Object({
+      path: Type.String({ description: "File path, relative to the project directory" }),
+    });
+  const read: AgentTool<typeof readParams> = {
     name: "read",
     label: "Read File",
     description: "Read a file's contents.",
-    parameters: Type.Object({
-      path: Type.String({ description: "File path, relative to the project directory" }),
-    }),
+    parameters: readParams,
     execute: async (_id, params) => {
       const path = join(deps.cwd, params.path);
       const text = readFileSync(path, "utf8");
@@ -68,14 +70,15 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     },
   };
 
-  const write: AgentTool = {
+  const writeParams = Type.Object({
+      path: Type.String({ description: "File path, relative to the project directory" }),
+      content: Type.String({ description: "Full file content to write" }),
+    });
+  const write: AgentTool<typeof writeParams> = {
     name: "write",
     label: "Write File",
     description: "Create or overwrite a file with the given content.",
-    parameters: Type.Object({
-      path: Type.String({ description: "File path, relative to the project directory" }),
-      content: Type.String({ description: "Full file content to write" }),
-    }),
+    parameters: writeParams,
     execute: async (_id, params) => {
       const path = join(deps.cwd, params.path);
       mkdirSync(join(path, ".."), { recursive: true });
@@ -96,14 +99,15 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     }
   }
 
-  const grep: AgentTool = {
+  const grepParams = Type.Object({
+      pattern: Type.String({ description: "Regular expression to search for" }),
+      path: Type.Optional(Type.String({ description: "Directory to search (default: project root)" })),
+    });
+  const grep: AgentTool<typeof grepParams> = {
     name: "grep",
     label: "Grep",
     description: "Search file contents with a regular expression.",
-    parameters: Type.Object({
-      pattern: Type.String({ description: "Regular expression to search for" }),
-      path: Type.Optional(Type.String({ description: "Directory to search (default: project root)" })),
-    }),
+    parameters: grepParams,
     execute: async (_id, params) => {
       const base = join(deps.cwd, params.path ?? ".");
       const re = new RegExp(params.pattern);
@@ -130,13 +134,14 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     },
   };
 
-  const glob: AgentTool = {
+  const globParams = Type.Object({
+      pattern: Type.String({ description: "Glob pattern, e.g. src/**/*.ts" }),
+    });
+  const glob: AgentTool<typeof globParams> = {
     name: "glob",
     label: "Glob",
     description: "List files matching a glob pattern.",
-    parameters: Type.Object({
-      pattern: Type.String({ description: "Glob pattern, e.g. src/**/*.ts" }),
-    }),
+    parameters: globParams,
     execute: async (_id, params) => {
       const re = globToRegex(params.pattern);
       const files: string[] = [];

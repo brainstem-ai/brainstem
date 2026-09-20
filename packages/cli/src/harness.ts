@@ -29,6 +29,7 @@ export interface Harness {
   agent: Agent;
   engine: ReflexEngine;
   journal: Journal;
+  journalPath: string;
   prompt(text: string): Promise<void>;
 }
 
@@ -181,6 +182,7 @@ export function createHarness(options: HarnessOptions): Harness {
     agent,
     engine,
     journal,
+    journalPath: options.journalPath,
     async prompt(text: string) {
       task = text;
       journal.append({ t: "user_message", ts: Date.now(), text });

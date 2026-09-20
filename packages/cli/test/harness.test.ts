@@ -3,8 +3,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
-import type { AssistantMessage, StreamFn } from "@earendil-works/pi-ai";
-import { mockSystemOne, choiceAnswer, noulAnswer, scoreAnswer } from "@brainstem/core";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+import { mockSystemOne, choiceAnswer, noulAnswer, scoreAnswer, type Answer } from "@brainstem/core";
 import { createHarness } from "../src/harness";
 
 const NO_USAGE = {
@@ -40,7 +41,7 @@ function scriptedStream(script: AssistantMessage[]): StreamFn {
     i += 1;
     queueMicrotask(() => {
       stream.push({ type: "start", partial: message });
-      stream.push({ type: "done", reason: message.stopReason, message });
+      stream.push({ type: "done", reason: message.stopReason as "stop" | "toolUse", message });
       stream.end(message);
     });
     return stream;
@@ -62,7 +63,7 @@ describe("harness integration", () => {
     );
     const journalPath = join(dir, "journal.ndjson");
 
-    const mock = mockSystemOne((state, questions) => {
+    const mock = mockSystemOne((state, questions): Record<string, Answer> => {
       if ("contains_agent_directive" in questions) {
         return {
           contains_agent_directive: noulAnswer(0.98),
@@ -81,7 +82,7 @@ describe("harness integration", () => {
       };
     });
 
-    const { agent, engine, journalPath: jp } = createHarness({
+    const { agent } = createHarness({
       systemOne: mock,
       streamFn: scriptedStream([
         assistantMessage(
@@ -99,9 +100,6 @@ describe("harness integration", () => {
       journalPath,
       cwd: dir,
     });
-    void engine;
-    void jp;
-
     await agent.prompt("Fix the failing auth test");
 
     const journal = readFileSync(journalPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
@@ -136,7 +134,7 @@ describe("harness integration", () => {
     dir = mkdtempSync(join(tmpdir(), "brainstem-harness-"));
     const journalPath = join(dir, "journal.ndjson");
 
-    const mock = mockSystemOne((_state, questions) => {
+    const mock = mockSystemOne((_state, questions): Record<string, Answer> => {
       if ("contains_agent_directive" in questions) {
         return {
           contains_agent_directive: noulAnswer(0.02),
