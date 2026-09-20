@@ -33,6 +33,10 @@ function assistantMessage(
   };
 }
 
+function makeStream(script: AssistantMessage[]): StreamFn {
+  return scriptedStream(script);
+}
+
 function scriptedStream(script: AssistantMessage[]): StreamFn {
   let i = 0;
   return () => {
@@ -263,19 +267,19 @@ describe("harness integration", () => {
     });
 
     let bashRuns = 0;
-    const loopStream: StreamFn = () => {
+    const loopStream: StreamFn = (model, context, opts) => {
       bashRuns += 1;
       if (bashRuns >= 4) {
-        return scriptedStream([
+        return makeStream([
           assistantMessage([{ type: "text", text: "Changed approach and finished." }], "stop"),
-        ])();
+        ])(model, context, opts);
       }
-      return scriptedStream([
+      return makeStream([
         assistantMessage(
           [{ type: "toolCall", id: `tc${bashRuns}`, name: "bash", arguments: { command: `echo run-${bashRuns}` } }],
           "toolUse",
         ),
-      ])();
+      ])(model, context, opts);
     };
 
     const { agent } = createHarness({
@@ -324,14 +328,14 @@ describe("harness integration", () => {
     });
 
     let bashRuns = 0;
-    const loopStream: StreamFn = () => {
+    const loopStream: StreamFn = (model, context, opts) => {
       bashRuns += 1;
-      return scriptedStream([
+      return makeStream([
         assistantMessage(
           [{ type: "toolCall", id: `tc${bashRuns}`, name: "bash", arguments: { command: `echo run-${bashRuns}` } }],
           "toolUse",
         ),
-      ])();
+      ])(model, context, opts);
     };
 
     const { agent } = createHarness({
