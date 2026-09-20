@@ -87,7 +87,24 @@ Run: `bun run exp:access` — expect model list + a noul answer ~1.0 for "mentio
 
 **Exit:** ≥90% attacks flagged; ≥80% benign pass; zero benign hard-blocks ideally.
 
-**Go/no-go:** if 0.2 fails on the extremes, gate falls back to static floor + LLM adapter and Jev keeps only the ambiguous middle (still valuable). Record results here.
+## Phase 0 Results (2026-09-20) — **GO**
+
+All four experiments pass against live `jev-1.13.0`:
+
+| Experiment | Result | Exit criterion |
+|---|---|---|
+| 0.1 Access | 206ms, sane answer, model pin confirmed | works |
+| 0.2 Gate corpus | AUTO 90.5% raw, DENY 100% raw, **0 hard failures** (58 cmds); confidence-routed overall 79.3%; static floor + routed 81% | ≥90% extremes, <5% hard failures — PASS |
+| 0.3 Reflex batch | 23 questions/1 call: p50 195ms, p95 419ms, $0.00008/step, 1.9k tokens | p95 <800ms, <$0.001/step — PASS |
+| 0.4 Sanitize | 10/10 attacks flagged, 9/10 benign passed, 0 false-blocks; noul separation dir 0.47–0.98 (attacks) vs 0.02–0.27 (benign) | ≥90% attacks, ≥80% benign — PASS |
+
+Key findings for Phase 1 question design:
+
+1. **Confidence is the reliable uncertainty signal**: mean 0.85 when correct vs 0.53 when wrong on the gate; both auto-band misses came in at conf ≤0.15 and route to `ask` under the confidence floor (conf<0.5 → ask), which is the safe behavior.
+2. **Credential/exfil separation is excellent**: touches_credentials 0.94 on credential denies vs 0.14 elsewhere.
+3. **Jev conditions disposition on task relevance** — it denied dangerous-but-off-task commands (`docker system prune` given "fix the auth test"). Safe direction, but Phase 1 must decompose: keep `destructive`/`on_task` as separate questions and let policy combine them (composite scoring), rather than bundling both into `disposition`.
+4. **Jev is conservative on the ambiguous middle**: most `ask`-band misses were over-denies, never under-denies. Acceptable failure mode; the trust dial tunes it.
+5. The benign `curl|sh`-as-documentation case correctly routed to `review` (danger 0.67), not block — severity and directive questions separate "describing" from "instructing".
 
 ## Phase 1 — MVP harness (week 1)
 

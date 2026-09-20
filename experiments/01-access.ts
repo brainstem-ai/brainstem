@@ -7,7 +7,7 @@ import { getClient, MODEL } from "./lib";
 const client = getClient();
 
 const models = await client.models.list();
-console.log("available models:", models.models.map((m) => m.name).join(", "));
+console.log("available models:", models.map((m) => m.name).join(", "));
 
 const t0 = performance.now();
 const result = await client.systemOne({

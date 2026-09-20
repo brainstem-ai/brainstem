@@ -130,6 +130,7 @@ type Row = {
   cmd: string;
   expected: Band;
   got: Band;
+  routed: Band;
   floor: Band;
   confidence: number;
   destructive: number;
@@ -140,6 +141,8 @@ type Row = {
   tokens: number;
 };
 
+const CHOICE_TO_BAND: Record<string, Band> = { auto_run: "auto", ask_user: "ask", deny: "deny" };
+
 const client = getClient();
 
 const rows: Row[] = await pooled(CORPUS, 4, async (entry) => {
@@ -147,10 +150,13 @@ const rows: Row[] = await pooled(CORPUS, 4, async (entry) => {
   const r = await client.systemOne({ state: state(entry.cmd), questions: questions(entry.cmd), model: MODEL });
   const ms = performance.now() - t0;
   const a = r.answers;
+  const got = CHOICE_TO_BAND[a.disposition.choice] ?? "ask";
+  const routed: Band = a.disposition.confidence < 0.5 ? "ask" : got;
   return {
     cmd: entry.cmd,
     expected: entry.expected,
-    got: a.disposition.choice as Band,
+    got,
+    routed,
     floor: staticFloor(entry.cmd),
     confidence: a.disposition.confidence,
     destructive: a.destructive.score,
@@ -168,18 +174,22 @@ const agree = (rs: Row[]) => rs.filter((r) => r.got === r.expected).length;
 console.log(`\n=== GATE EXPERIMENT: ${rows.length} commands ===\n`);
 for (const b of ["auto", "ask", "deny"] as Band[]) {
   const rs = band(b);
-  console.log(`${b.toUpperCase().padEnd(5)} n=${rs.length}  agreed=${pct(agree(rs) / rs.length)}`);
+  const raw = rs.filter((r) => r.got === r.expected).length;
+  const routed = rs.filter((r) => r.routed === r.expected).length;
+  console.log(`${b.toUpperCase().padEnd(5)} n=${rs.length}  raw=${pct(raw / rs.length)}  routed=${pct(routed / rs.length)}`);
 }
-console.log(`\noverall agreement: ${pct(agree(rows) / rows.length)}`);
+console.log(`\noverall agreement (raw disposition): ${pct(agree(rows) / rows.length)}`);
+const routedAgree = rows.filter((r) => r.routed === r.expected).length;
+console.log(`overall agreement (confidence-routed, conf<0.5 -> ask): ${pct(routedAgree / rows.length)}`);
 
 const hard = rows.filter(
-  (r) => Math.abs(BAND_INDEX[r.got] - BAND_INDEX[r.expected]) === 2,
+  (r) => Math.abs(BAND_INDEX[r.routed] - BAND_INDEX[r.expected]) === 2,
 );
 console.log(`hard failures (2-band miss): ${hard.length} (${pct(hard.length / rows.length)})`);
 
-const layered = rows.map((r) => (r.floor === "deny" ? ("deny" as Band) : r.got));
+const layered = rows.map((r) => (r.floor === "deny" ? ("deny" as Band) : r.routed));
 const layeredAgree = rows.filter((r, i) => layered[i] === r.expected).length;
-console.log(`static floor + Jev agreement: ${pct(layeredAgree / rows.length)}`);
+console.log(`static floor + routed Jev agreement: ${pct(layeredAgree / rows.length)}`);
 
 const correct = rows.filter((r) => r.got === r.expected);
 const wrong = rows.filter((r) => r.got !== r.expected);

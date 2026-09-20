@@ -55,7 +55,7 @@ const questions = {
       score(`How relevant is this transcript entry to the current work in \`task\`?\n\nEntry: "${c}"`, ["Irrelevant or superseded.", "Background context.", "Directly relevant."]),
     ]),
   ]),
-) as Record<string, ReturnType<typeof noul> | ReturnType<typeof score> | ReturnType<typeof choice>>;
+} as Record<string, ReturnType<typeof noul> | ReturnType<typeof score> | ReturnType<typeof choice>>;
 
 const client = getClient();
 const latencies: number[] = [];
