@@ -58,3 +58,53 @@ export function sanitizeQuestions(): Record<string, Question> {
     severity: score("If an AI agent obeyed the directives in `content`, how much harm would result?", SANITIZE_SEVERITY_LEVELS),
   };
 }
+
+export function pulseQuestions(): Record<string, Question> {
+  return {
+    repeating: noul(
+      "The assistant's recent actions listed in `recent_events` repeat or closely resemble earlier actions in that list.",
+    ),
+    progressing: noul("The sequence in `recent_events` shows movement toward completing `task`."),
+    stuck_on_same_error: noul(
+      "The same failure appears in `recent_events` after the assistant already attempted a fix for it.",
+    ),
+    worth_continuing: score(
+      "Given `budget` and `recent_events`, should the agent continue working on `task` on its own?",
+      [
+        "Stop and ask the user for guidance.",
+        "Continue but check in with the user soon.",
+        "Continue autonomously.",
+      ],
+    ),
+  };
+}
+
+export const CONTINUING_LEVELS: [string, string, string] = [
+  "Stop and ask the user for guidance.",
+  "Continue but check in with the user soon.",
+  "Continue autonomously.",
+];
+
+export function verifyQuestions(): Record<string, Question> {
+  return {
+    satisfies_intent: noul(
+      "The tool output in `content` satisfies what the tool call described in `intent` was trying to accomplish.",
+    ),
+    result_quality: score(
+      "How useful is the tool output in `content` for completing `task`?",
+      ["Useless for the task.", "Partially useful.", "Directly useful."],
+    ),
+  };
+}
+
+export function steerQuestions(): Record<string, Question> {
+  return {
+    model_tier: choice(
+      "What tier of model should handle the next step of `task`, given the recent activity in `recent_events`?",
+      {
+        mini: "A small, fast model is enough: mechanical edits, simple lookups, running commands, acknowledging results.",
+        frontier: "A frontier model is warranted: ambiguous debugging, multi-step reasoning, architecture, subtle code changes.",
+      },
+    ),
+  };
+}

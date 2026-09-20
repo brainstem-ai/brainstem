@@ -14,6 +14,11 @@ describe("policyForTrust", () => {
     expect(p.sanitize.review).toBe(0.35);
     expect(p.sanitize.action).toBe(0.7);
     expect(p.sanitize.severityBlock).toBe(2.0);
+    expect(p.pulse.repeatNoul).toBe(0.7);
+    expect(p.pulse.stuckNoul).toBe(0.7);
+    expect(p.pulse.progressNoul).toBe(0.3);
+    expect(p.pulse.stopScore).toBe(0.5);
+    expect(p.steer.miniConfidence).toBe(0.6);
   });
 
   test("higher trust lowers the auto-run confidence bar monotonically", () => {
