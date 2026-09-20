@@ -1,8 +1,8 @@
 import { staticVerdict } from "./floor";
-import { appendJournalEvent, type Journal } from "./journal";
+import type { Journal } from "./journal";
 import { policyForTrust, type Policy } from "./policy";
-import { gateQuestions, sanitizeQuestions } from "./questions";
-import type { Answer, AskResult, SystemOne } from "./types";
+import { gateQuestions, pulseQuestions, sanitizeQuestions, steerQuestions, verifyQuestions } from "./questions";
+import type { Answer, AskResult, Question, SystemOne } from "./types";
 
 export type GateAction = "auto" | "ask" | "deny";
 
@@ -22,6 +22,25 @@ export type SanitizeAction = "pass" | "review" | "block";
 
 export interface SanitizeDecision {
   action: SanitizeAction;
+  reasons: string[];
+}
+
+export type VerifyAction = "ok" | "mismatch";
+
+export interface VerifyDecision {
+  action: VerifyAction;
+  reasons: string[];
+}
+
+export type PulseAction = "continue" | "intervene" | "stop";
+
+export interface PulseDecision {
+  action: PulseAction;
+  reasons: string[];
+}
+
+export interface SteerDecision {
+  tier: "frontier" | "mini";
   reasons: string[];
 }
 
@@ -108,6 +127,55 @@ export function decideSanitize(answers: Record<string, Answer>, policy: Policy):
   return { action: "pass", reasons };
 }
 
+export function decideVerify(answers: Record<string, Answer>, policy: Policy): VerifyDecision {
+  const reasons: string[] = [];
+  const satisfied = answers.satisfies_intent?.type === "noul" ? answers.satisfies_intent.noul : 1;
+  const quality = answers.result_quality?.type === "score" ? answers.result_quality.score : 2;
+
+  if (satisfied < policy.confidenceFloor && quality <= 0.5) {
+    return {
+      action: "mismatch",
+      reasons: [`satisfies_intent=${satisfied.toFixed(2)} below floor ${policy.confidenceFloor}, quality ${quality.toFixed(1)}`],
+    };
+  }
+  return { action: "ok", reasons };
+}
+
+export function decidePulse(answers: Record<string, Answer>, policy: Policy): PulseDecision {
+  const reasons: string[] = [];
+  const repeating = answers.repeating?.type === "noul" ? answers.repeating.noul : 0;
+  const progressing = answers.progressing?.type === "noul" ? answers.progressing.noul : 1;
+  const stuck = answers.stuck_on_same_error?.type === "noul" ? answers.stuck_on_same_error.noul : 0;
+  const worth = answers.worth_continuing?.type === "score" ? answers.worth_continuing.score : 2;
+
+  if (worth <= policy.pulse.stopScore) {
+    return { action: "stop", reasons: [`worth_continuing=${worth.toFixed(1)} <= stop line ${policy.pulse.stopScore}`] };
+  }
+  if (repeating >= policy.pulse.repeatNoul) {
+    reasons.push(`repeating=${repeating.toFixed(2)} >= ${policy.pulse.repeatNoul}`);
+  }
+  if (stuck >= policy.pulse.stuckNoul) {
+    reasons.push(`stuck on same error=${stuck.toFixed(2)} >= ${policy.pulse.stuckNoul}`);
+  }
+  if (progressing <= policy.pulse.progressNoul) {
+    reasons.push(`not progressing=${progressing.toFixed(2)} <= ${policy.pulse.progressNoul}`);
+  }
+  if (reasons.length > 0) return { action: "intervene", reasons };
+
+  return { action: "continue", reasons };
+}
+
+export function decideSteer(answers: Record<string, Answer>, policy: Policy): SteerDecision {
+  const tier = answers.model_tier?.type === "choice" ? answers.model_tier : undefined;
+  if (!tier || tier.choice !== "mini") {
+    return { tier: "frontier", reasons: ["default frontier"] };
+  }
+  if (tier.confidence >= policy.steer.miniConfidence) {
+    return { tier: "mini", reasons: [`mini at confidence ${tier.confidence.toFixed(2)}`] };
+  }
+  return { tier: "frontier", reasons: [`mini chosen but confidence ${tier.confidence.toFixed(2)} below bar`] };
+}
+
 export interface ReflexEngineDeps {
   systemOne: SystemOne;
   journal: Journal;
@@ -155,16 +223,58 @@ export class ReflexEngine {
   }
 
   async sanitize(content: string, source: string): Promise<SanitizeDecision & { result: AskResult }> {
+    const observed = await this.observeToolResult(content, source, "unspecified tool call");
+    return { ...observed.sanitize, result: observed.result };
+  }
+
+  async observeToolResult(
+    content: string,
+    source: string,
+    intent: string,
+  ): Promise<{ sanitize: SanitizeDecision; verify: VerifyDecision; result: AskResult }> {
     const state = {
       situation:
         "A coding agent is working in a repository and just read this content as the output of a tool (a file, command output, or web page).",
+      intent,
       content,
     };
-    const result = await this.systemOne.ask(state, sanitizeQuestions());
-    this.recordReflex("sanitize", source, state, sanitizeQuestions(), result);
+    const questions = { ...sanitizeQuestions(), ...verifyQuestions() };
+    const result = await this.systemOne.ask(state, questions);
+    this.recordReflex("sanitize", source, state, questions, result);
 
-    const decision = decideSanitize(result.answers, this.policy);
-    this.recordDecision("sanitize", decision, source);
+    const sanitize = decideSanitize(result.answers, this.policy);
+    const verify = decideVerify(result.answers, this.policy);
+    this.recordDecision("sanitize", sanitize, source);
+    this.recordDecision("verify", verify, source);
+    return { sanitize, verify, result };
+  }
+
+  async pulse(input: { task: string; events: string[]; budget: string }): Promise<PulseDecision & { result: AskResult }> {
+    const state = {
+      task: input.task,
+      recent_events: input.events,
+      budget: input.budget,
+    };
+    const questions = pulseQuestions();
+    const result = await this.systemOne.ask(state, questions);
+    this.recordReflex("pulse", input.task, state, questions, result);
+
+    const decision = decidePulse(result.answers, this.policy);
+    this.recordDecision("pulse", decision, input.task);
+    return { ...decision, result };
+  }
+
+  async steer(input: { task: string; events: string[] }): Promise<SteerDecision & { result: AskResult }> {
+    const state = {
+      task: input.task,
+      recent_events: input.events,
+    };
+    const questions = steerQuestions();
+    const result = await this.systemOne.ask(state, questions);
+    this.recordReflex("steer", input.task, state, questions, result);
+
+    const decision = decideSteer(result.answers, this.policy);
+    this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task);
     return { ...decision, result };
   }
 
