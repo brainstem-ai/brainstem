@@ -21,6 +21,7 @@ export interface HarnessOptions {
   journalPath: string;
   cwd: string;
   systemPrompt?: string;
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   onReflex?: (line: string) => void;
   onDelta?: (delta: string) => void;
 }
@@ -74,6 +75,7 @@ export function createHarness(options: HarnessOptions): Harness {
       systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
       model: options.model,
       tools,
+      thinkingLevel: options.thinkingLevel ?? "low",
     },
     streamFn: options.streamFn,
     beforeToolCall: async ({ toolCall, args }) => {
