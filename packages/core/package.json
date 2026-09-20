@@ -1,0 +1,9 @@
+{
+  "name": "@brainstem/core",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  }
+}
