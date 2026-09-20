@@ -120,9 +120,15 @@ TDD per task (vitest + mock provider; live Jev only in marked integration tests)
 8. ✅ CLI harness: pi-agent-core Agent, `beforeToolCall`→gate (bash/write, static reads), `afterToolCall`→sanitize, events→journal, tools (bash/read/write/grep/glob), trust dial, one-shot + REPL. Integration tests run a fully scripted agent (mock streamFn): destructive bash blocked by floor with zero Jev calls, injected README blocked and replaced, safe command auto-runs (7 test files, 41 tests).
 9. ⬜ Live smoke: `bun packages/cli/src/main.ts --task "..."` in a scratch repo (needs ANTHROPIC_API_KEY).
 
-## Phase 2 — Full reflexes (week 2)
+## Phase 2 — Full reflexes (week 2) — ✅ DONE
 
-Pulse (`shouldStopAfterTurn`), Steer (streamFn wrapper per-turn model swap), Verify (`afterToolCall`), `brainstem replay` re-scoring CLI (threshold tuning loop), ink TUI with per-step reflex verdicts.
+- ✅ **Pulse** (`shouldStopAfterTurn`, every N turns): repeating / progressing / stuck / worth-continuing battery → `continue` | `intervene` (steers the agent to change approach) | `stop` (ends the loop).
+- ✅ **Steer** (streamFn wrapper): per-LLM-call model-tier routing between `--model` and `--mini-model` (zai: glm-5.3 vs glm-5.3-flash). Live demo: routed all turns to flash at conf 0.97–1.00 on a mechanical task.
+- ✅ **Verify** (fused with sanitize via speculative fan-out — one call, 6 questions): does the tool output satisfy the tool-call intent; mismatch annotates the result for the LLM.
+- ✅ **`brainstem replay <journal> [--trust N]`**: offline re-scoring of recorded journals against a new policy. Live: 9 decisions re-scored, policy flip detected (write auto→ask at low trust).
+- Fix found by integration tests: pi-ai system messages carry string content (not blocks) — summarizer hardened; steered messages must use content blocks.
+
+Deferred: ink TUI (stdout rendering suffices for now).
 
 ## Phase 3 — Publish
 
