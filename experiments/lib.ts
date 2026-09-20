@@ -13,7 +13,7 @@ export function getClient(): TypeSafeClient {
 
 export function stats(nums: number[]): { p50: number; p95: number; mean: number } {
   const s = [...nums].sort((a, b) => a - b);
-  const at = (q: number) => s[Math.min(s.length - 1, Math.floor(q * s.length))];
+  const at = (q: number) => s[Math.min(s.length - 1, Math.floor(q * s.length))] ?? 0;
   return { p50: at(0.5), p95: at(0.95), mean: nums.reduce((a, b) => a + b, 0) / nums.length };
 }
 
@@ -27,7 +27,9 @@ export async function pooled<T, R>(items: T[], limit: number, fn: (item: T) => P
     while (true) {
       const i = next++;
       if (i >= items.length) break;
-      results[i] = await fn(items[i]);
+      const item = items[i];
+      if (item === undefined) break;
+      results[i] = await fn(item);
     }
   });
   await Promise.all(workers);
