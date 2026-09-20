@@ -6,12 +6,20 @@
     "exp:access": "bun run experiments/01-access.ts",
     "exp:gate": "bun run experiments/02-gate-corpus.ts",
     "exp:timing": "bun run experiments/03-batch-timing.ts",
-    "exp:sanitize": "bun run experiments/04-sanitize.ts"
+    "exp:sanitize": "bun run experiments/04-sanitize.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0"
   },
   "devDependencies": {
-    "bun-types": "^1.4.2"
-  }
+    "bun-types": "^1.4.2",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "trustedDependencies": [
+    "@google/genai",
+    "protobufjs"
+  ]
 }
