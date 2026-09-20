@@ -1,0 +1,17 @@
+{
+  "name": "brainstem",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "exp:access": "bun run experiments/01-access.ts",
+    "exp:gate": "bun run experiments/02-gate-corpus.ts",
+    "exp:timing": "bun run experiments/03-batch-timing.ts",
+    "exp:sanitize": "bun run experiments/04-sanitize.ts"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.2"
+  }
+}

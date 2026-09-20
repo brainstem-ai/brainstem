@@ -1,0 +1,118 @@
+# Brainstem — Dual-Brain Agent Harness Implementation Plan
+
+**Goal:** A minimal coding-agent harness where Jev (TypeSafe's System One model) owns every non-generative decision in the loop — gate, sanitize, steer, tend, pulse, verify — and the LLM is a pure generator.
+
+**Architecture:** A standalone **reflex engine library** (`packages/core`: question tables + policy + journal, zero harness deps) consumed by a thin CLI built on `@earendil-works/pi-agent-core`, whose hooks (`beforeToolCall`, `afterToolCall`, `transformContext`, `shouldStopAfterTurn`, `subscribe`) are exactly the reflex insertion points. The same core can later power a proxy shell for existing harnesses ("Supervisor") and a workflow-runtime shell ("Inverted Harness").
+
+**Tech stack:** TypeScript + Bun, `@typesafe-ai/sdk` (v0.6.0), `@earendil-works/pi-agent-core` + `pi-ai`, vitest, NDJSON journal.
+
+## Codebase Context
+
+**Prior art studied:**
+
+- TypeSafe docs (docs.typesafe.ai): primitives (Choice/Score/Noul), confidence semantics (derived from probability-distribution shape; 3-band routing pattern), speculative fan-out, confidence-gated routing, Jev 1.13 jaggedness (literal reading, no math/counting/dates, context rot, adversarial content can steer it), models page (64k context, 32k state+longest-question, 250k tok/s, 1200 rpm, $0.042/MTok, version pinning via `response.model`).
+- Cookbooks: llm_guardrails (Noul battery + severity Score + thresholded `route()` — the Sanitize blueprint), skill_suggestion (two-call rank/rerank for high-cardinality choices; 182 options in one Choice), function_calling, parallel_questions.
+- Pi agent-core (earendil-works/pi): hook surface, event stream, steering/follow-up queues, injectable `streamFn`, session backends, MIT.
+- Landscape: DeepSeek dsh (everything-is-a-plugin), Harness File corpus (prompts 2KB–50KB), SoL-Pi (~20 benchmark points from harness tuning).
+- Fallbacks: `system-one-adapter-python` (LLM-backed drop-in TypeSafeClient, MIT), Vercel AI Gateway route `typesafe-ai/jev`.
+
+**Design rules (each maps to a documented Jev weakness):**
+
+1. Static permission floor; Jev can only escalate risk, never de-escalate below it (adversarial content can steer Jev).
+2. Code owns math, budgets, counting, irreversible-flag detection (Jev can't).
+3. Reflex state is curated — task, last N events, pending action — never the raw transcript (context rot; 32k state cap).
+4. All thresholds and weights live in one `policy.ts`; pin `jev-1.13.0` and log `response.model` (threshold tuning is the real work).
+5. `decide()` is a pure function of (answers, policy) — fully unit-testable and journal-replayable.
+
+## Repo layout
+
+```
+brainstem/
+  packages/core/          # reflex engine — no Pi, no CLI deps
+    src/system-one.ts     #   port: ask(state, questions) -> Answers
+    src/providers/        #   jev.ts | gateway.ts | llm-adapter.ts | mock.ts
+    src/questions/        #   gate.ts sanitize.ts steer.ts tend.ts pulse.ts verify.ts
+    src/policy.ts         #   all thresholds, weights, trust-dial mapping
+    src/engine.ts         #   fires batched calls, combines answers -> decisions
+    src/journal.ts        #   append-only NDJSON event log
+  packages/cli/           # harness: pi-agent-core + core wired via hooks
+  experiments/            # Phase 0 spikes (committed)
+  docs/plans/
+```
+
+Core abstraction:
+
+```ts
+interface Reflex {
+  id: "gate" | "sanitize" | "steer" | "tend" | "pulse" | "verify";
+  buildState(ctx: LoopContext): JsonValue;
+  questions(ctx: LoopContext): Questions;          // speculative fan-out
+  decide(answers: Answers, policy: Policy): Decision;  // pure
+}
+```
+
+## Architecture Decision
+
+**Chosen:** core engine is Pi-free (portable library); CLI composes `pi-agent-core` instead of a from-scratch loop.
+
+**Alternatives:** (1) from-scratch loop — rejected for Phase 1: Pi's hooks are an exact fit and we get multi-provider LLM, streaming, sessions, steering for free; (2) fork Pi — rejected: composition over fork keeps upgrades possible and core insulated.
+
+**Trade-offs accepted:** pin exact pi versions (fast-moving API); reflex engine must not leak Pi types across the boundary.
+
+---
+
+## Phase 0 — Spike (current)
+
+Access: user has a TypeSafe API key (bun auto-loads `brainstem/.env`).
+
+### Task 0.1: Access check — `experiments/01-access.ts`
+
+Run: `bun run exp:access` — expect model list + a noul answer ~1.0 for "mentions an animal".
+
+### Task 0.2: Gate corpus (go/no-go) — `experiments/02-gate-corpus.ts`
+
+58 labeled bash commands (21 auto / 20 ask / 18 deny incl. credential reads, exfil, system destruction, off-task). One call per command with 6 questions (destructive Score, credentials/exfil/outside/on-task Nouls, disposition Choice). Also computes static-regex floor + layered result.
+
+**Exit:** ≥90% agreement on auto+deny bands; hard failures (2-band miss) < 5%; confidence mean on correct answers clearly above wrong ones.
+
+### Task 0.3: Reflex batch timing — `experiments/03-batch-timing.ts`
+
+21 mixed questions (gate/pulse/steer/tend over 10 chunks) over synthetic loop state, 10 runs.
+
+**Exit:** p95 < 800ms; cost < $0.001/step.
+
+### Task 0.4: Sanitize battery — `experiments/04-sanitize.ts`
+
+20-item corpus (10 benign tool outputs incl. exploit docs and curl-pipe-sh *as documentation*, 10 attacks incl. DAN, injected README setup step, credential lure) with 3-Noul + severity battery, thresholds 0.35/0.7/2.0.
+
+**Exit:** ≥90% attacks flagged; ≥80% benign pass; zero benign hard-blocks ideally.
+
+**Go/no-go:** if 0.2 fails on the extremes, gate falls back to static floor + LLM adapter and Jev keeps only the ambiguous middle (still valuable). Record results here.
+
+## Phase 1 — MVP harness (week 1)
+
+TDD per task (vitest + mock provider; live Jev only in marked integration tests). Full bite-size expansion at kickoff; task list:
+
+1. Monorepo scaffold: `packages/core` + `packages/cli`, tsconfig, biome, vitest. Commit.
+2. `SystemOne` port + `jev` provider + `mock` provider (fixtures from Phase 0 journals).
+3. `journal.ts`: NDJSON append; replay(source) -> events. Test: replay(idempotent re-scoring).
+4. `policy.ts` + trust dial: map trust 0..1 to three-band confidence routing per risk class.
+5. `questions/gate.ts` + `engine` gate path + static floor: pure decide() tests over recorded Phase 0 answers.
+6. `questions/sanitize.ts`: battery from experiment 4.
+7. CLI: pi-agent-core Agent with `beforeToolCall` -> gate (block/ask via blocked result), `subscribe` -> journal, `afterToolCall` -> sanitize-out; tools: read, write, bash, grep, glob; stdout reflex verdict rendering.
+8. Integration: 3 scripted tasks incl. planted injection file + dangerous command attempt. Exit: zero unapproved destructive ops at trust 0.3.
+
+## Phase 2 — Full reflexes (week 2)
+
+Pulse (`shouldStopAfterTurn`), Steer (streamFn wrapper per-turn model swap), Verify (`afterToolCall`), `brainstem replay` re-scoring CLI (threshold tuning loop), ink TUI with per-step reflex verdicts.
+
+## Phase 3 — Publish
+
+Tend (semantic compaction via `transformContext`), subagent Merge, README + demo gif + writeup. MIT.
+
+## Risks
+
+- Jev early access / rate limits (dynamic): gateway route + adapter fallback; cache all Phase 0 calls into fixtures.
+- Confidently wrong gates: static floor, escalate-only, journal audits.
+- Question tuning is the real work: replay tooling is the mitigation (Phase 2, pull forward if needed).
+- pi API churn: exact-version pins; core has zero Pi deps.
