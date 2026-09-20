@@ -17,11 +17,13 @@ export interface HarnessOptions {
   systemOne: SystemOne;
   streamFn: StreamFn;
   model: Model<Api>;
+  miniModel?: Model<Api>;
   trust: number;
   journalPath: string;
   cwd: string;
   systemPrompt?: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  pulseEveryTurns?: number;
   onReflex?: (line: string) => void;
   onDelta?: (delta: string) => void;
 }
@@ -70,6 +72,39 @@ export function createHarness(options: HarnessOptions): Harness {
 
   const tools: AgentTool[] = makeTools({ cwd: options.cwd });
 
+  function textOfAny(content: unknown): string {
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return "";
+    return textOf(content as { type: string; text?: string }[]);
+  }
+
+  function summarizeMessages(messages: { role: string; content?: unknown; toolName?: string }[]): string[] {
+    return messages
+      .filter((m) => m.role !== "system")
+      .slice(-8)
+      .map((m) => {
+        const text = textOfAny(m.content).slice(0, 140).replace(/\n/g, " ");
+        if (m.role === "user") return `user: ${text}`;
+        if (m.role === "assistant") return `assistant: ${text || "(tool calls)"}`;
+        if (m.role === "toolResult") return `tool ${m.toolName}: ${text}`;
+        return `${m.role}: ${text}`;
+      });
+  }
+
+  let turnsCompleted = 0;
+  let modelCalls = 0;
+
+  const innerStreamFn = options.streamFn;
+  const routedStreamFn: StreamFn = async (model, context, streamOptions) => {
+    modelCalls += 1;
+    if (options.miniModel) {
+      const decision = await engine.steer({ task, events: summarizeMessages(context.messages) });
+      options.onReflex?.(render("steer", decision.tier, decision.reasons));
+      return innerStreamFn(decision.tier === "mini" ? options.miniModel : model, context, streamOptions);
+    }
+    return innerStreamFn(model, context, streamOptions);
+  };
+
   const agent = new Agent({
     initialState: {
       systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
@@ -77,7 +112,34 @@ export function createHarness(options: HarnessOptions): Harness {
       tools,
       thinkingLevel: options.thinkingLevel ?? "low",
     },
-    streamFn: options.streamFn,
+    streamFn: routedStreamFn,
+    shouldStopAfterTurn: async () => {
+      turnsCompleted += 1;
+      const every = options.pulseEveryTurns ?? 3;
+      if (turnsCompleted % every !== 0) return false;
+
+      const decision = await engine.pulse({
+        task,
+        events: summarizeMessages(agent.state.messages),
+        budget: `${modelCalls} model calls so far`,
+      });
+      options.onReflex?.(render("pulse", decision.action, decision.reasons));
+
+      if (decision.action === "stop") return true;
+      if (decision.action === "intervene") {
+        agent.steer({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `[brainstem] reflex intervention: ${decision.reasons.join("; ")}. Change your approach — do not simply repeat your previous steps.`,
+            },
+          ],
+          timestamp: Date.now(),
+        });
+      }
+      return false;
+    },
     beforeToolCall: async ({ toolCall, args }) => {
       const a = (args ?? {}) as { command?: string; path?: string };
 
@@ -120,27 +182,36 @@ export function createHarness(options: HarnessOptions): Harness {
       const text = textOf((result?.content ?? []) as { type: string; text?: string }[]);
       if (!text.trim()) return undefined;
 
-      const decision = await engine.sanitize(text.slice(0, 8000), `tool:${toolCall.name}`);
-      options.onReflex?.(render("sanitize", decision.action, decision.reasons));
+      const intent = `${toolCall.name} ${JSON.stringify(toolCall.arguments)}`;
+      const observed = await engine.observeToolResult(text.slice(0, 8000), `tool:${toolCall.name}`, intent);
+      options.onReflex?.(render("sanitize", observed.sanitize.action, observed.sanitize.reasons));
+      if (observed.verify.action === "mismatch") {
+        options.onReflex?.(render("verify", observed.verify.action, observed.verify.reasons));
+      }
 
-      if (decision.action === "block") {
+      const notes: string[] = [];
+      if (observed.sanitize.action === "block") {
         return {
           content: [
             {
               type: "text",
-              text: `[brainstem] blocked tool output (probable injected instructions): ${decision.reasons.join("; ")}`,
+              text: `[brainstem] blocked tool output (probable injected instructions): ${observed.sanitize.reasons.join("; ")}`,
             },
           ],
         };
       }
-      if (decision.action === "review") {
+      if (observed.sanitize.action === "review") {
+        notes.push(`[brainstem] review this content: ${observed.sanitize.reasons.join("; ")}`);
+      }
+      if (observed.verify.action === "mismatch") {
+        notes.push(
+          `[brainstem] verify: this output may not satisfy what the tool call was trying to do (${observed.verify.reasons.join("; ")}). Consider a different approach if progress stalls.`,
+        );
+      }
+
+      if (notes.length > 0) {
         return {
-          content: [
-            {
-              type: "text",
-              text: `[brainstem] review this content: ${decision.reasons.join("; ")}\n\n${text}`,
-            },
-          ],
+          content: [{ type: "text", text: `${notes.join("\n")}\n\n${text}` }],
         };
       }
       return undefined;
