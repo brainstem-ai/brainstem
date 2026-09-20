@@ -110,14 +110,15 @@ Key findings for Phase 1 question design:
 
 TDD per task (vitest + mock provider; live Jev only in marked integration tests). Full bite-size expansion at kickoff; task list:
 
-1. Monorepo scaffold: `packages/core` + `packages/cli`, tsconfig, biome, vitest. Commit.
-2. `SystemOne` port + `jev` provider + `mock` provider (fixtures from Phase 0 journals).
-3. `journal.ts`: NDJSON append; replay(source) -> events. Test: replay(idempotent re-scoring).
-4. `policy.ts` + trust dial: map trust 0..1 to three-band confidence routing per risk class.
-5. `questions/gate.ts` + `engine` gate path + static floor: pure decide() tests over recorded Phase 0 answers.
-6. `questions/sanitize.ts`: battery from experiment 4.
-7. CLI: pi-agent-core Agent with `beforeToolCall` -> gate (block/ask via blocked result), `subscribe` -> journal, `afterToolCall` -> sanitize-out; tools: read, write, bash, grep, glob; stdout reflex verdict rendering.
-8. Integration: 3 scripted tasks incl. planted injection file + dangerous command attempt. Exit: zero unapproved destructive ops at trust 0.3.
+1. ✅ Monorepo scaffold: `packages/core` + `packages/cli`, tsconfig, vitest.
+2. ✅ `SystemOne` port + `jev` provider + `mock` provider (3 tests).
+3. ✅ `journal.ts`: NDJSON append; `loadJournal` replay (3 tests).
+4. ✅ `policy.ts` + trust dial: safety thresholds trust-invariant (5 tests).
+5. ✅ `static floor`: deny/ask patterns from Phase 0 (6 tests).
+6. ✅ `questions.ts`: gate + sanitize batteries as data (3 tests).
+7. ✅ `engine.ts`: `decideGate`/`decideSanitize` pure + ReflexEngine with floor precedence (17 tests; sanitize restricted to hazard IDs after answer-pollution bug found in integration).
+8. ✅ CLI harness: pi-agent-core Agent, `beforeToolCall`→gate (bash/write, static reads), `afterToolCall`→sanitize, events→journal, tools (bash/read/write/grep/glob), trust dial, one-shot + REPL. Integration tests run a fully scripted agent (mock streamFn): destructive bash blocked by floor with zero Jev calls, injected README blocked and replaced, safe command auto-runs (7 test files, 41 tests).
+9. ⬜ Live smoke: `bun packages/cli/src/main.ts --task "..."` in a scratch repo (needs ANTHROPIC_API_KEY).
 
 ## Phase 2 — Full reflexes (week 2)
 
