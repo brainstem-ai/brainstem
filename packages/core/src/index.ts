@@ -4,3 +4,5 @@ export * from "./types";
 export { jevSystemOne, DEFAULT_JEV_MODEL } from "./providers/jev";
 export { mockSystemOne, noulAnswer, choiceAnswer, scoreAnswer } from "./providers/mock";
 export type { MockSystemOne } from "./providers/mock";
+export { openJournal, appendJournalEvent, loadJournal } from "./journal";
+export type { Journal, JournalEvent } from "./journal";
