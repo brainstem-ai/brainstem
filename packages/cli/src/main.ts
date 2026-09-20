@@ -121,7 +121,7 @@ Usage:
   }
 
   let miniModel: ReturnType<typeof models.getModel> = undefined;
-  const [miniProvider, miniId] = args.miniModel.split("/");
+  const [miniProvider = "", miniId = ""] = args.miniModel.split("/");
   if (miniProvider === providerId) {
     miniModel = model;
   } else {
