@@ -2,6 +2,7 @@
 import { createInterface } from "node:readline";
 import { createModels } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
+import { zaiProvider } from "@earendil-works/pi-ai/providers/zai";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { DEFAULT_TRUST, jevSystemOne } from "@brainstem/core";
 import { createHarness } from "./harness";
@@ -23,7 +24,7 @@ const RESET = "\x1b[0m";
 function parseArgs(argv: string[]): Args {
   const args: Args = {
     trust: DEFAULT_TRUST,
-    model: "anthropic/claude-sonnet-4-5",
+    model: "zai/glm-5.3",
     journal: `~/.brainstem/journal-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.ndjson`,
     cwd: process.cwd(),
     help: false,
@@ -69,6 +70,7 @@ Usage: brainstem [--trust 0..1] [--model provider/id] [--journal path] [--task "
   const [providerId = "", modelId = ""] = args.model.split("/");
   const models = createModels();
   if (providerId === "anthropic") models.setProvider(anthropicProvider());
+  if (providerId === "zai") models.setProvider(zaiProvider());
   const model = models.getModel(providerId, modelId);
   if (!model) {
     console.error(`unknown model ${args.model}`);
