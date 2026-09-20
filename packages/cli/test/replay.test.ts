@@ -57,7 +57,7 @@ describe("replayJournal", () => {
 
   test("re-decides sanitize and verify reflexes", () => {
     const answers = {
-      contains_agent_directive: { type: "noul", noul: 0.5 },
+      contains_agent_directive: { type: "noul", noul: 0.1 },
       tries_to_override: { type: "noul", noul: 0.1 },
       requests_dangerous_action: { type: "noul", noul: 0.05 },
       severity: { type: "score", score: 0.5, probabilities: {}, confidence: 0.9 },
