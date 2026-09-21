@@ -64,14 +64,22 @@ export function jevSystemOne(client: TypeSafeClient, model = DEFAULT_JEV_MODEL):
 
       // The internal controller is passed to the SDK in case it honors signals; if it does
       // not, the cancellation race below still rejects and the SDK call is left to settle.
+      //
+      // `signal` belongs in the SDK's second (RequestOptions) parameter, not folded into
+      // the request body alongside state/questions/model — the `as never` casts previously
+      // here hid that mismatch from the type checker, and the server rejected every real
+      // call with a 400 as a result. Verified against the SDK's actual published types and
+      // a live call after this fix.
       try {
         const response = await Promise.race([
-          client.systemOne({
-            state: state as never,
-            questions: questions as never,
-            model,
-            signal: controller.signal,
-          } as never),
+          client.systemOne(
+            {
+              state: state as never,
+              questions: questions as never,
+              model,
+            },
+            { signal: controller.signal },
+          ),
           cancellation,
         ]);
         const result: AskResult = {
