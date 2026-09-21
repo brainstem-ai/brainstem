@@ -1,4 +1,4 @@
-import { createBitmap, type ReflexEngine, type SelectDecision, type SelectInput } from "@brainstem/core";
+import { clearBit, createBitmap, type ReflexEngine, type SelectDecision, type SelectInput } from "@brainstem/core";
 import type { CapabilityRegistry } from "./registry";
 
 export interface SelectTrigger {
@@ -60,6 +60,16 @@ export class SelectDriver {
 
   currentDecision(): SelectDecision | undefined {
     return this.#lastDecision;
+  }
+
+  clearRecommended(ids: string[]): void {
+    if (!this.#lastDecision) return;
+    const catalog = this.#registry.snapshot();
+    const indexById = new Map(catalog.entries.map((d, i) => [d.id, i] as const));
+    for (const id of ids) {
+      const i = indexById.get(id);
+      if (i !== undefined) clearBit(this.#lastDecision.recommended, i);
+    }
   }
 }
 

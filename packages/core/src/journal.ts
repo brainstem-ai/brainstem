@@ -113,6 +113,16 @@ export type JournalEvent =
       byteCount: number;
       presentedViewHash?: string;
       sectionManifestHash?: string;
+    }
+  | {
+      t: "capability_set";
+      v: 2;
+      ts: number;
+      taskId?: string;
+      turnId?: string;
+      catalogHash: string;
+      activeIds: string[];
+      instructionHash?: string;
     };
 
 export interface Journal {
