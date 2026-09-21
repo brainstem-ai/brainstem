@@ -2,9 +2,11 @@
   "name": "@brainstem/cli",
   "version": "0.1.0",
   "type": "module",
-  "bin": { "brainstem": "./src/main.ts" },
+  "bin": {
+    "brainstem": "./src/main.ts"
+  },
   "dependencies": {
-    "@brainstem/core": "file:../core",
+    "@brainstem/core": "workspace:*",
     "@earendil-works/pi-agent-core": "0.86.1",
     "@earendil-works/pi-ai": "0.86.1",
     "@sinclair/typebox": "0.34.52"
