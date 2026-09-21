@@ -79,7 +79,7 @@ Each row is a reviewable implementation unit. Update this checklist as work land
 | F0 | Bounded output artifacts and recovery tools | P1, P2, P4 | Landed |
 | F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 | Landed |
 | F2 | Focus integration and controlled rollout | P8, F1 | Landed |
-| P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 | Not started |
+| P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 | Replay landed; evaluation tooling not started |
 | P10 | Measured caching, batching, and journal improvements | P9 | Not started |
 | P11 | Tend: deliberate provider-aware compaction checkpoints | P8, F2, P9; experimental | Not started |
 
@@ -506,7 +506,7 @@ Required integration scenarios before calling this iteration complete:
 - [x] Focusing changes only new presented results, and recovery receives normal sanitization.
 - [x] The provider sees the intended tools/skills on initial calls, later turns, and subsequent user prompts.
 - [ ] Tool/skill changes and checkpoints respect provider cache/opaque-reasoning contracts, not only tool pairing.
-- [ ] Journal v2 explains each decision and original-policy replay reproduces it.
+- [x] Journal v2 explains each decision and original-policy replay reproduces it (replay only — see P9's scope note for what evaluation tooling this excludes).
 - [x] Outages follow the documented fallback table; hard budgets remain independent of Jev.
 - [ ] Evaluation reports outcomes, selection errors, cost, context size, and measured critical-path timing.
 
