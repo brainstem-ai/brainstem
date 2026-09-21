@@ -34,8 +34,6 @@ const DENY_WRITE_PATHS: RegExp[] = [
   /id_rsa|id_ed25519|authorized_keys|\.ssh\//,
 ];
 
-const ASK_WRITE_PATHS: RegExp[] = [/^\.\.\//, /^\/tmp\//, /^\//];
-
 const ASK_READ_PATHS: RegExp[] = [
   /(^|\/)\.env(\.|$)/,
   /(~|\/)\.aws\//,
@@ -43,11 +41,32 @@ const ASK_READ_PATHS: RegExp[] = [
   /id_rsa|id_ed25519/,
 ];
 
-function normalizePath(path: string): string {
-  return path.replace(/^~(?=\/|$)/, `${process.env.HOME ?? "~"}`);
+const HOME = process.env.HOME ?? "";
+
+function expandHome(path: string): string {
+  return path.replace(/^~(?=\/|$)/, HOME || "~");
 }
 
-export function staticVerdict(tool: string, action: StaticAction): StaticVerdict {
+function resolveUnderRoot(root: string, target: string): string {
+  const expanded = expandHome(target);
+  const abs = expanded.startsWith("/") ? expanded : `${root.replace(/\/+$/, "")}/${expanded}`;
+  const parts: string[] = [];
+  for (const seg of abs.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") parts.pop();
+    else parts.push(seg);
+  }
+  return "/" + parts.join("/");
+}
+
+function isInside(root: string, resolved: string): boolean {
+  const base = root.replace(/\/+$/, "") || "/";
+  if (resolved === base) return true;
+  return resolved.startsWith(base.endsWith("/") ? base : `${base}/`);
+}
+
+export function staticVerdict(tool: string, action: StaticAction, root: string): StaticVerdict {
+  // Command-pattern checks are NOT an OS sandbox — they are a heuristic first line of defense.
   if (tool === "bash" && action.command) {
     const cmd = action.command;
     if (DENY_COMMANDS.some((re) => re.test(cmd))) return "deny";
@@ -56,15 +75,11 @@ export function staticVerdict(tool: string, action: StaticAction): StaticVerdict
   }
 
   if (action.path) {
-    const path = normalizePath(action.path);
-    const home = process.env.HOME ?? "";
-    const inProject = !path.startsWith("/") || path.startsWith(process.cwd());
-    const underHome = home !== "" && (path === home || path.startsWith(home + "/"));
+    const path = resolveUnderRoot(root, action.path);
 
     if (tool === "write") {
       if (DENY_WRITE_PATHS.some((re) => re.test(path))) return "deny";
-      if (!inProject && !underHome) return "ask";
-      if (ASK_WRITE_PATHS.some((re) => re.test(path)) && !path.startsWith(process.cwd())) return "ask";
+      if (!isInside(root, path)) return "ask";
       return null;
     }
 
