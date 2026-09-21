@@ -1,9 +1,19 @@
+import { checkBudgets, type BudgetCheck, type BudgetLimits } from "./budgets";
 import { newId } from "./evidence";
+import { JevCancelledError, JevUnavailableError } from "./errors";
 import { staticVerdict, type StaticVerdict } from "./floor";
 import type { Journal, ReflexStatus } from "./journal";
 import { policyForTrust, type Policy } from "./policy";
-import { gateQuestions, pulseQuestions, sanitizeQuestions, steerQuestions, verifyQuestions } from "./questions";
-import type { Answer, AskResult, Question, SystemOne } from "./types";
+import {
+  gateQuestions,
+  pulseQuestions,
+  sanitizeQuestions,
+  sanitizeVerifyGroups,
+  steerQuestions,
+  verifyQuestions,
+} from "./questions";
+import type { Answer, AskOptions, AskResult, JudgmentOutcome, Question, SystemOne } from "./types";
+import { validateAnswers, validateGroups } from "./validation";
 
 export type GateAction = "auto" | "ask" | "deny";
 
@@ -31,6 +41,8 @@ export type VerifyAction = "ok" | "mismatch";
 export interface VerifyDecision {
   action: VerifyAction;
   reasons: string[];
+  // true only when a completed judgment backed the decision; a fallback is NOT a positive verification
+  verified: boolean;
 }
 
 export type PulseAction = "continue" | "intervene" | "stop";
@@ -137,9 +149,10 @@ export function decideVerify(answers: Record<string, Answer>, policy: Policy): V
     return {
       action: "mismatch",
       reasons: [`satisfies_intent=${satisfied.toFixed(2)} below floor ${policy.confidenceFloor}, quality ${quality.toFixed(1)}`],
+      verified: true,
     };
   }
-  return { action: "ok", reasons };
+  return { action: "ok", reasons, verified: true };
 }
 
 export function decidePulse(answers: Record<string, Answer>, policy: Policy): PulseDecision {
@@ -191,7 +204,17 @@ export interface ReflexEngineDeps {
   root: string;
   makeId?: () => string;
   ids?: () => ReflexIds;
+  budgets?: BudgetLimits;
+  knownSpendUsd?: number;
+  signal?: AbortSignal;
+  now?: () => number;
 }
+
+type Judgment = JudgmentOutcome & {
+  judgmentId: string;
+  answers?: Record<string, Answer>;
+  groups?: Record<string, Record<string, Answer> | null>;
+};
 
 export class ReflexEngine {
   private readonly systemOne: SystemOne;
@@ -201,6 +224,12 @@ export class ReflexEngine {
   private readonly root: string;
   private readonly makeId: () => string;
   private readonly ids: () => ReflexIds;
+  private readonly budgetLimits: BudgetLimits;
+  private readonly knownSpendUsd: number | "unknown";
+  private readonly signal?: AbortSignal;
+  private readonly now: () => number;
+  private readonly startedAt: number;
+  private modelCalls = 0;
 
   constructor(deps: ReflexEngineDeps) {
     this.systemOne = deps.systemOne;
@@ -210,6 +239,103 @@ export class ReflexEngine {
     this.root = deps.root;
     this.makeId = deps.makeId ?? (() => newId("j"));
     this.ids = deps.ids ?? (() => ({ sessionId: "" }));
+    this.budgetLimits = deps.budgets ?? {};
+    this.knownSpendUsd = deps.knownSpendUsd ?? "unknown";
+    this.signal = deps.signal;
+    this.now = deps.now ?? Date.now;
+    this.startedAt = this.now();
+  }
+
+  noteModelCall(): void {
+    this.modelCalls += 1;
+  }
+
+  enforceBudgets(): BudgetCheck {
+    return checkBudgets(
+      { modelCalls: this.modelCalls, elapsedMs: this.now() - this.startedAt, knownSpendUsd: this.knownSpendUsd },
+      this.budgetLimits,
+    );
+  }
+
+  private askOptions(): AskOptions {
+    const options: AskOptions = { deadlineMs: this.policy.jev.deadlineMs };
+    if (this.signal) options.signal = this.signal;
+    return options;
+  }
+
+  private budgetReason(): string | null {
+    const check = this.enforceBudgets();
+    if (check.ok) return null;
+    return `budget exceeded: ${check.breached.join(", ")}`;
+  }
+
+  private async request(
+    reflex: string,
+    subject: string,
+    state: unknown,
+    questions: Record<string, Question>,
+    groups?: Record<string, string[]>,
+  ): Promise<Judgment> {
+    const judgmentId = this.makeId();
+    const record = (status: ReflexStatus, result: AskResult | null, reason?: string): void => {
+      this.recordReflex(reflex, subject, state, questions, result, judgmentId, status, reason);
+    };
+
+    const budget = this.budgetReason();
+    if (budget !== null) {
+      record("unavailable", null, budget);
+      return { status: "unavailable", reason: budget, judgmentId };
+    }
+
+    try {
+      const result = await this.systemOne.ask(state, questions, this.askOptions());
+      if (!groups) {
+        const answers = validateAnswers(questions, result.answers);
+        record("completed", result);
+        return { status: "completed", result, judgmentId, answers };
+      }
+      const { groups: valid, errors } = validateGroups(questions, result.answers, groups);
+      if (Object.keys(errors).length === 0) {
+        const answers = Object.assign({}, ...Object.values(valid)) as Record<string, Answer>;
+        record("completed", result);
+        return { status: "completed", result, judgmentId, answers };
+      }
+      const reason = Object.entries(errors)
+        .map(([name, message]) => `${name}: ${message}`)
+        .join("; ");
+      record("unavailable", null, reason);
+      return { status: "unavailable", reason, judgmentId, groups: valid };
+    } catch (error) {
+      if (error instanceof JevCancelledError) {
+        record("cancelled", null, error.message);
+        return { status: "cancelled", reason: error.message, judgmentId };
+      }
+      const reason =
+        error instanceof JevUnavailableError ? error.message : `judgment failed: ${error instanceof Error ? error.message : String(error)}`;
+      record("unavailable", null, reason);
+      return { status: "unavailable", reason, judgmentId };
+    }
+  }
+
+  private fallbackGate(floor: StaticVerdict, cause: string): GateDecision {
+    if (floor === "ask") return { action: "ask", reasons: ["static floor: risky pattern", cause] };
+    return { action: "ask", reasons: ["judgment unavailable", cause] };
+  }
+
+  private fallbackSanitize(cause: string): SanitizeDecision {
+    return { action: "block", reasons: ["sanitizer unavailable — content withheld", cause] };
+  }
+
+  private fallbackVerify(cause: string): VerifyDecision {
+    return { action: "ok", reasons: ["verification unavailable — result not verified", cause], verified: false };
+  }
+
+  private fallbackPulse(cause: string): PulseDecision {
+    return { action: "continue", reasons: ["pulse unavailable", cause] };
+  }
+
+  private fallbackSteer(cause: string): SteerDecision {
+    return { tier: "frontier", reasons: ["steer unavailable — using main model", cause] };
   }
 
   async gate(input: GateInput): Promise<GateDecision & { result?: AskResult }> {
@@ -221,25 +347,29 @@ export class ReflexEngine {
       return decision;
     }
 
-    const judgmentId = this.makeId();
     const state = {
       task: input.task,
       environment: this.environment,
       action: { tool: input.tool, command: input.command },
     };
     const questions = gateQuestions(input.command, input.task);
-    const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("gate", input.command, state, questions, result, judgmentId);
+    const judgment = await this.request("gate", input.command, state, questions);
 
-    let decision = decideGate(result.answers, this.policy);
+    if (judgment.status !== "completed") {
+      const decision = this.fallbackGate(floor, judgment.reason);
+      this.recordDecision("gate", decision, input.command, { judgmentId: judgment.judgmentId, staticVerdict: floor });
+      return decision;
+    }
+
+    let decision = decideGate(judgment.answers!, this.policy);
     if (floor === "ask" && decision.action === "auto") {
       decision = { action: "ask", reasons: ["static floor: risky pattern", ...decision.reasons] };
     }
-    this.recordDecision("gate", decision, input.command, { judgmentId, staticVerdict: floor });
-    return { ...decision, result };
+    this.recordDecision("gate", decision, input.command, { judgmentId: judgment.judgmentId, staticVerdict: floor });
+    return { ...decision, result: judgment.result };
   }
 
-  async sanitize(content: string, source: string): Promise<SanitizeDecision & { result: AskResult }> {
+  async sanitize(content: string, source: string): Promise<SanitizeDecision & { result: AskResult | null }> {
     const observed = await this.observeToolResult(content, source, "unspecified tool call");
     return { ...observed.sanitize, result: observed.result };
   }
@@ -248,8 +378,7 @@ export class ReflexEngine {
     content: string,
     source: string,
     intent: string,
-  ): Promise<{ sanitize: SanitizeDecision; verify: VerifyDecision; result: AskResult }> {
-    const judgmentId = this.makeId();
+  ): Promise<{ sanitize: SanitizeDecision; verify: VerifyDecision; result: AskResult | null }> {
     const state = {
       situation:
         "A coding agent is working in a repository and just read this content as the output of a tool (a file, command output, or web page).",
@@ -257,53 +386,77 @@ export class ReflexEngine {
       content,
     };
     const questions = { ...sanitizeQuestions(), ...verifyQuestions() };
-    const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("sanitize", source, state, questions, result, judgmentId);
+    const judgment = await this.request("sanitize", source, state, questions, sanitizeVerifyGroups());
 
-    const sanitize = decideSanitize(result.answers, this.policy);
-    const verify = decideVerify(result.answers, this.policy);
-    this.recordDecision("sanitize", sanitize, source, { judgmentId });
-    this.recordDecision("verify", verify, source, { judgmentId });
+    let sanitize: SanitizeDecision;
+    let verify: VerifyDecision;
+    let result: AskResult | null = null;
+    if (judgment.status === "completed") {
+      sanitize = decideSanitize(judgment.answers!, this.policy);
+      verify = decideVerify(judgment.answers!, this.policy);
+      result = judgment.result;
+    } else {
+      // A broken group must not invalidate its sibling: a still-valid sanitize group decides normally.
+      const sanitizeValid = judgment.groups?.sanitize ?? null;
+      sanitize = sanitizeValid !== null ? decideSanitize(sanitizeValid, this.policy) : this.fallbackSanitize(judgment.reason);
+      const verifyValid = judgment.groups?.verify ?? null;
+      // verified is true only when the judgment completed; a group that merely validated within a
+      // failed judgment is still not a positive verification.
+      verify =
+        verifyValid !== null
+          ? { ...decideVerify(verifyValid, this.policy), verified: false }
+          : this.fallbackVerify(judgment.reason);
+    }
+    this.recordDecision("sanitize", sanitize, source, { judgmentId: judgment.judgmentId });
+    this.recordDecision("verify", verify, source, { judgmentId: judgment.judgmentId });
     return { sanitize, verify, result };
   }
 
-  async pulse(input: { task: string; events: string[]; budget: string }): Promise<PulseDecision & { result: AskResult }> {
-    const judgmentId = this.makeId();
+  async pulse(input: { task: string; events: string[]; budget: string }): Promise<PulseDecision & { result: AskResult | null }> {
     const state = {
       task: input.task,
       recent_events: input.events,
       budget: input.budget,
     };
     const questions = pulseQuestions();
-    const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("pulse", input.task, state, questions, result, judgmentId);
+    const judgment = await this.request("pulse", input.task, state, questions);
 
-    const decision = decidePulse(result.answers, this.policy);
-    this.recordDecision("pulse", decision, input.task, { judgmentId });
-    return { ...decision, result };
+    if (judgment.status !== "completed") {
+      const decision = this.fallbackPulse(judgment.reason);
+      this.recordDecision("pulse", decision, input.task, { judgmentId: judgment.judgmentId });
+      return { ...decision, result: null };
+    }
+
+    const decision = decidePulse(judgment.answers!, this.policy);
+    this.recordDecision("pulse", decision, input.task, { judgmentId: judgment.judgmentId });
+    return { ...decision, result: judgment.result };
   }
 
-  async steer(input: { task: string; events: string[] }): Promise<SteerDecision & { result: AskResult }> {
-    const judgmentId = this.makeId();
+  async steer(input: { task: string; events: string[] }): Promise<SteerDecision & { result: AskResult | null }> {
     const state = {
       task: input.task,
       recent_events: input.events,
     };
     const questions = steerQuestions();
-    const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("steer", input.task, state, questions, result, judgmentId);
+    const judgment = await this.request("steer", input.task, state, questions);
 
-    const decision = decideSteer(result.answers, this.policy);
-    this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task, { judgmentId });
-    return { ...decision, result };
+    if (judgment.status !== "completed") {
+      const decision = this.fallbackSteer(judgment.reason);
+      this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task, { judgmentId: judgment.judgmentId });
+      return { ...decision, result: null };
+    }
+
+    const decision = decideSteer(judgment.answers!, this.policy);
+    this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task, { judgmentId: judgment.judgmentId });
+    return { ...decision, result: judgment.result };
   }
 
   private recordReflex(
     reflex: string,
     subject: string,
     state: unknown,
-    questions: Record<string, import("./types").Question>,
-    result: AskResult,
+    questions: Record<string, Question>,
+    result: AskResult | null,
     judgmentId: string,
     status: ReflexStatus = "completed",
     reason?: string,
