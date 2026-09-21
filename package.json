@@ -9,6 +9,8 @@
     "exp:sanitize": "bun run experiments/04-sanitize.ts",
     "eval:live": "bun run experiments/evals/live-scenarios.ts",
     "eval:cache-benchmark": "bun run experiments/evals/cache-benchmark.ts",
+    "eval:select": "bun run experiments/evals/select-value.ts",
+    "eval:with-without": "bun run experiments/evals/with-without-harness.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
