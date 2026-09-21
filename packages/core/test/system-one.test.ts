@@ -87,11 +87,17 @@ describe("jev provider", () => {
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  test("forwards state, questions, and pinned model to the SDK client", async () => {
-    const seen: unknown[] = [];
+  test("forwards state, questions, and pinned model to the SDK client, with signal in the options parameter", async () => {
+    // The SDK's real signature is systemOne(request, options) — signal belongs in
+    // options, never folded into the request body alongside state/questions/model.
+    // A prior version of jev.ts got this wrong and every real call was rejected
+    // with a 400; this test pins the corrected call shape against both arguments.
+    const seenRequests: unknown[] = [];
+    const seenOptions: unknown[] = [];
     const fakeClient = {
-      systemOne: async (req: unknown) => {
-        seen.push(req);
+      systemOne: async (req: unknown, options: unknown) => {
+        seenRequests.push(req);
+        seenOptions.push(options);
         return {
           model: "jev-1.13.0",
           usage: { input_tokens: 1, output_tokens: 0 },
@@ -103,12 +109,12 @@ describe("jev provider", () => {
     const provider = jevSystemOne(fakeClient as never, "jev-1.13.0");
     await provider.ask({ task: "x" }, { safe: questions.safe! });
 
-    expect(seen[0]).toEqual({
+    expect(seenRequests[0]).toEqual({
       state: { task: "x" },
       questions: { safe: questions.safe },
       model: "jev-1.13.0",
-      signal: expect.any(AbortSignal),
     });
+    expect(seenOptions[0]).toEqual({ signal: expect.any(AbortSignal) });
   });
 
   test("hanging SDK call past the deadline rejects cancelled", async () => {
