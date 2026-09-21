@@ -28,10 +28,13 @@ const ASK_COMMANDS: RegExp[] = [
 
 const DENY_WRITE_PATHS: RegExp[] = [
   /^~\/\.ssh\//,
-  /^(\/etc|\/var|\/usr|\/System|\/Library)\//,
   /(^|\/)\.env(\.|$)/,
   /(^|\/)\.aws\//,
   /id_rsa|id_ed25519|authorized_keys|\.ssh\//,
+];
+
+const DENY_WRITE_OUTSIDE_ROOT: RegExp[] = [
+  /^(\/etc|\/var|\/usr|\/System|\/Library)\//,
 ];
 
 const ASK_READ_PATHS: RegExp[] = [
@@ -76,10 +79,14 @@ export function staticVerdict(tool: string, action: StaticAction, root: string):
 
   if (action.path) {
     const path = resolveUnderRoot(root, action.path);
+    const inside = isInside(root, path);
 
     if (tool === "write") {
       if (DENY_WRITE_PATHS.some((re) => re.test(path))) return "deny";
-      if (!isInside(root, path)) return "ask";
+      if (!inside) {
+        if (DENY_WRITE_OUTSIDE_ROOT.some((re) => re.test(path))) return "deny";
+        return "ask";
+      }
       return null;
     }
 

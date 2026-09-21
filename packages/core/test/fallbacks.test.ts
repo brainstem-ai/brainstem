@@ -17,7 +17,6 @@ function gateAnswers(): Record<string, Answer> {
     destructive: scoreAnswer(0.0, 0.9),
     touches_credentials: noulAnswer(0.05),
     exfiltrates: noulAnswer(0.03),
-    writes_outside_project: noulAnswer(0.02),
     on_task: noulAnswer(0.9),
     disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
   };
@@ -31,6 +30,8 @@ function sanitizeAnswers(): Record<string, Answer> {
     severity: scoreAnswer(0.0, 0.9),
     satisfies_intent: noulAnswer(0.9),
     result_quality: scoreAnswer(1.0, 0.85),
+    evidence_of_success: noulAnswer(0.9),
+    operational_failure: noulAnswer(0.05),
   };
 }
 
@@ -114,7 +115,7 @@ describe("engine fallbacks on unavailable judgment", () => {
 
   test("verify marks the result unverified with unavailable status when judgment fails", async () => {
     const { engine, journalPath } = engineWith(mockSystemOne.failing("provider down"));
-    const observed = await engine.observeToolResult("content", "tool:read x", "intent");
+    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "content" });
 
     expect(observed.verify.action).toBe("ok");
     expect(observed.verify.verified).toBe(false);
@@ -128,7 +129,7 @@ describe("engine fallbacks on unavailable judgment", () => {
     const { satisfies_intent: _s, result_quality: _q, ...sanitizeOnly } = sanitizeAnswers();
     const provider = mockSystemOne(() => sanitizeOnly);
     const { engine, journalPath } = engineWith(provider);
-    const observed = await engine.observeToolResult("clean content", "tool:read x", "intent");
+    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "clean content" });
 
     expect(observed.sanitize.action).toBe("pass");
     expect(observed.verify.verified).toBe(false);
@@ -146,7 +147,7 @@ describe("engine fallbacks on unavailable judgment", () => {
       contains_agent_directive: { type: "bogus" } as unknown as Answer,
     }));
     const { engine } = engineWith(provider);
-    const observed = await engine.observeToolResult("content", "tool:read x", "intent");
+    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "content" });
 
     expect(observed.sanitize.action).toBe("block");
     expect(observed.sanitize.reasons[0]).toBe("sanitizer unavailable — content withheld");
@@ -187,7 +188,7 @@ describe("engine fallbacks on unavailable judgment", () => {
 
   test("completed judgments still verify positively", async () => {
     const { engine } = engineWith(mockSystemOne(() => sanitizeAnswers()));
-    const observed = await engine.observeToolResult("clean", "tool:read x", "intent");
+    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "clean" });
     expect(observed.verify.verified).toBe(true);
     expect(observed.result).not.toBeNull();
   });

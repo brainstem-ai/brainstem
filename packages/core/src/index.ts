@@ -60,7 +60,7 @@ export { gateQuestions, sanitizeQuestions, pulseQuestions, steerQuestions, verif
 export { policyForTrust, DEFAULT_TRUST } from "./policy";
 export type { Policy } from "./policy";
 export { staticVerdict } from "./floor";
-export { ReflexEngine, decideGate, decideSanitize, decideVerify, decidePulse, decideSteer } from "./engine";
+export { ReflexEngine, decideGate, decideSanitize, decideVerify, decidePulse, decideSteer, buildEnvelope } from "./engine";
 export type {
   GateDecision,
   GateInput,
@@ -72,6 +72,14 @@ export type {
   PulseDecision,
   PulseAction,
   SteerDecision,
+  SteerInput,
+  SteerOptions,
+  SteerTier,
+  ObservationEnvelope,
+  ObserveToolResultInput,
+  PulseFacts,
+  RepeatedAction,
+  PulseDecideFacts,
   ReflexEngineDeps,
   ReflexIds,
 } from "./engine";
