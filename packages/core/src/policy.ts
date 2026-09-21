@@ -27,6 +27,11 @@ export interface Policy {
   steer: {
     miniConfidence: number;
   };
+  // Configurable, explicitly experimental thresholds. Do not wire trust to these numbers.
+  select: {
+    addNoul: number;
+    retainNoul: number;
+  };
   jev: {
     deadlineMs: number;
     // Reserved for P10; this unit keeps retries disabled.
@@ -72,6 +77,10 @@ export function policyForTrust(trust: number): Policy {
   },
   steer: {
     miniConfidence: 0.6,
+  },
+  select: {
+    addNoul: 0.65,
+    retainNoul: 0.45,
   },
   jev: {
     deadlineMs: 1500,
