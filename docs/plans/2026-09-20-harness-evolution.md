@@ -75,20 +75,24 @@ Each row is a reviewable implementation unit. Update this checklist as work land
 | P5 | Better gate, sanitize, verify, pulse, and steer evidence | P3, P4 | Landed |
 | P6 | Capability registry and versioned bitmap implementation | P2 | Landed |
 | P7 | Jev Select and capability policy | P4, P6 | Landed |
-| P8 | Skill loading, discovery, and dynamic context integration | P5, P7 | Not started |
+| P8 | Skill loading, discovery, and dynamic context integration | P5, P7 | Landed |
 | F0 | Bounded output artifacts and recovery tools | P1, P2, P4 | Landed |
-| F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 | Not started |
+| F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 | Landed |
 | F2 | Focus integration and controlled rollout | P8, F1 | Not started |
 | P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 | Not started |
 | P10 | Measured caching, batching, and journal improvements | P9 | Not started |
 | P11 | Tend: deliberate provider-aware compaction checkpoints | P8, F2, P9; experimental | Not started |
 
-Select (P7) now turns Jev judgments into `evaluated`/`recommended` bitmaps via
-`ReflexEngine.select` and the CLI's `SelectDriver`, but nothing calls it from the
-harness yet and `CapabilityRegistry.workingSet()`'s zero-arg call sites are
-unchanged — the active set today is still baseline plus explicit. P8 is the
-first unit that instantiates a `SelectDriver`, adds `find_capabilities`, and
-changes the executable tool set at a turn boundary.
+Select (P7) turns Jev judgments into `evaluated`/`recommended` bitmaps, and P8
+now consumes them: `harness.ts` instantiates a `SelectDriver`, resolves the
+active set through `prepareNextTurnWithContext` at each turn boundary, adds
+`find_capabilities` for on-demand discovery (with pin/unpin, not `explicit`),
+and loads skills from configured `--skill-root` directories as appended system
+messages that never replace the harness's own system prompt. F1 lands the
+Focus mechanism itself (structural section splitting with UTF-8 byte offsets,
+Jev relevance scoring, budget-aware selection) as pure `packages/core`, not yet
+wired into the tool-result pipeline — F2 replaces the fixed-line-count
+presented view with a Focus-driven one and depends on this unit's types.
 
 Develop evaluation fixtures alongside each feature, then assemble the comparison suite in P9. Dependencies express sequencing, not a requirement to delegate to multiple agents.
 
