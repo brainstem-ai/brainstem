@@ -145,6 +145,46 @@ describe("journal (schema v2)", () => {
     expect(second?.t === "artifacts" && second.captureComplete).toBe(false);
   });
 
+  test("reflex event round-trips the P10 cache-provenance fields, and a fresh (non-cached) reflex omits them", () => {
+    const path = tmpPath("cache-fields.ndjson");
+    const cached = {
+      t: "reflex",
+      v: 2,
+      sessionId: "sess_b",
+      judgmentId: "j_new",
+      ts: 6,
+      reflex: "gate",
+      subject: "npm test",
+      status: "completed",
+      state: {},
+      questions: {},
+      result: { model: "jev-1.13.0", latencyMs: 0, usage: { inputTokens: 0, outputTokens: 0 }, answers: {} },
+      cacheHit: true,
+      cachedFromJudgmentId: "j_old",
+    };
+    const fresh = {
+      t: "reflex",
+      v: 2,
+      sessionId: "sess_b",
+      judgmentId: "j_old",
+      ts: 5,
+      reflex: "gate",
+      subject: "npm test",
+      status: "completed",
+      state: {},
+      questions: {},
+      result: { model: "jev-1.13.0", latencyMs: 180, usage: { inputTokens: 800, outputTokens: 0 }, answers: {} },
+    };
+    writeFileSync(path, [fresh, cached].map((l) => JSON.stringify(l)).join("\n") + "\n", "utf8");
+
+    const events = loadJournal(path);
+    const first = events[0];
+    const second = events[1];
+    expect(first?.t === "reflex" && first.cacheHit).toBeUndefined();
+    expect(second?.t === "reflex" && second.cacheHit).toBe(true);
+    expect(second?.t === "reflex" && second.cachedFromJudgmentId).toBe("j_old");
+  });
+
   test("loadJournal throws a clear error on unknown schema versions", () => {
     const path = tmpPath("v1.ndjson");
     writeFileSync(path, JSON.stringify({ t: "session_start", ts: 1, trust: 0.3 }) + "\n", "utf8");

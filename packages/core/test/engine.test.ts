@@ -11,6 +11,9 @@ import { compileCatalog, type CapabilityDescriptor } from "../src/capabilities";
 import { createBitmap, fromIds } from "../src/bitmap";
 import { encodeSelectId, SELECT_BATCH_CHAR_BUDGET } from "../src/selection";
 import { splitIntoSections } from "../src/output-sections";
+import { BoundedAnswerCache, computeCacheKey } from "../src/cache";
+import { gateQuestions } from "../src/questions";
+import type { AskResult, SystemOne } from "../src/types";
 
 const POLICY = policyForTrust(0.3);
 
@@ -51,12 +54,15 @@ afterEach(() => {
   dir = "";
 });
 
-function engineWith(script: (state: unknown, questions: Record<string, Question>) => Record<string, Answer>) {
+function engineWith(
+  script: (state: unknown, questions: Record<string, Question>) => Record<string, Answer>,
+  extraDeps: Partial<ConstructorParameters<typeof ReflexEngine>[0]> = {},
+) {
   const mock = mockSystemOne(script);
   dir = mkdtempSync(join(tmpdir(), "brainstem-engine-"));
   const journalPath = join(dir, "session.ndjson");
   const journal = openJournal(journalPath);
-  const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir });
+  const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir, ...extraDeps });
   return { mock, journalPath, engine };
 }
 
@@ -619,5 +625,135 @@ describe("ReflexEngine.focus", () => {
     const events = loadJournal(journalPath);
     expect(events.filter((e) => e.t === "reflex")).toHaveLength(0);
     expect(events.filter((e) => e.t === "decision" && e.reflex === "focus")).toHaveLength(1);
+  });
+});
+
+describe("ReflexEngine answer cache", () => {
+  function deferredSystemOne(name = "mock:deferred"): { systemOne: SystemOne; release: (answers: Record<string, Answer>) => void; callCount: () => number } {
+    let calls = 0;
+    const resolvers: ((answers: Record<string, Answer>) => void)[] = [];
+    const systemOne: SystemOne = {
+      name,
+      async ask(_state, _questions) {
+        calls += 1;
+        const answers = await new Promise<Record<string, Answer>>((resolve) => resolvers.push(resolve));
+        const result: AskResult = { model: name, latencyMs: 0, usage: { inputTokens: 0, outputTokens: 0 }, answers };
+        return result;
+      },
+    };
+    return {
+      systemOne,
+      release: (answers) => {
+        const resolve = resolvers.shift();
+        resolve?.(answers);
+      },
+      callCount: () => calls,
+    };
+  }
+
+  test("a cache hit skips the SystemOne call and journals cacheHit provenance", async () => {
+    const cache = new BoundedAnswerCache();
+    const { engine, mock, journalPath } = engineWith(gateScript({}), { cache });
+
+    const first = await engine.gate({ tool: "bash", command: "echo hi", task: "say hi" });
+    expect(first.action).toBe("auto");
+    expect(mock.calls).toHaveLength(1);
+
+    const second = await engine.gate({ tool: "bash", command: "echo hi", task: "say hi" });
+    expect(second.action).toBe("auto");
+    expect(mock.calls).toHaveLength(1); // no new SystemOne call
+
+    const events = loadJournal(journalPath);
+    const reflexEvents = events.filter((e): e is Extract<typeof e, { t: "reflex" }> => e.t === "reflex");
+    expect(reflexEvents).toHaveLength(2);
+    const [firstReflex, hit] = reflexEvents;
+    expect(firstReflex).toBeDefined();
+    expect(hit).toBeDefined();
+    expect(hit!.cacheHit).toBe(true);
+    expect(hit!.cachedFromJudgmentId).toBe(firstReflex!.judgmentId);
+    // Each occurrence still gets its own judgmentId, linking its own decision.
+    expect(hit!.judgmentId).not.toBe(firstReflex!.judgmentId);
+  });
+
+  test("distinct state/questions never collide", async () => {
+    const cache = new BoundedAnswerCache();
+    const { engine, mock } = engineWith(gateScript({}), { cache });
+
+    await engine.gate({ tool: "bash", command: "echo one", task: "t" });
+    await engine.gate({ tool: "bash", command: "echo two", task: "t" });
+    expect(mock.calls).toHaveLength(2);
+  });
+
+  test("unavailable and cancelled outcomes are never cached", async () => {
+    const cache = new BoundedAnswerCache();
+    const mock = mockSystemOne.failing("down for maintenance");
+    const journal = openJournal(join((dir = mkdtempSync(join(tmpdir(), "brainstem-engine-"))), "session.ndjson"));
+    const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir, cache });
+
+    const first = await engine.gate({ tool: "bash", command: "echo hi", task: "t" });
+    expect(first.action).toBe("ask"); // fallback
+
+    // If the failure had been cached, a second call would still short-circuit
+    // with zero new calls; instead the engine must genuinely retry.
+    const second = await engine.gate({ tool: "bash", command: "echo hi", task: "t" });
+    expect(second.action).toBe("ask");
+  });
+
+  test("a cache entry that fails revalidation falls through to a fresh call", async () => {
+    const cache = new BoundedAnswerCache();
+    // Pre-seed the exact key gate() will compute for this input, with answers
+    // the current gate questions no longer recognize — validateAnswers must
+    // reject it, and the engine must fall through rather than throw.
+    const key = computeCacheKey(
+      "mock",
+      { task: "t", environment: "A git repository in the current working directory.", action: { tool: "bash", command: "echo hi" } },
+      gateQuestions("t"),
+    );
+    cache.set(key, {
+      answers: { not_a_real_question: { type: "noul", noul: 0.9 } },
+      result: { model: "mock", latencyMs: 0, usage: { inputTokens: 0, outputTokens: 0 }, answers: {} },
+      originalJudgmentId: "j_stale",
+      cachedAt: 0,
+    });
+
+    const { engine, mock } = engineWith(gateScript({}), { cache });
+    const decision = await engine.gate({ tool: "bash", command: "echo hi", task: "t" });
+    expect(decision.action).toBe("auto");
+    expect(mock.calls).toHaveLength(1); // fell through to a fresh call, not a thrown error
+  });
+
+  test("budget exhaustion does not block a cache hit, only a genuine miss", async () => {
+    const cache = new BoundedAnswerCache();
+    const mock = mockSystemOne(gateScript({}));
+    const journalPath = join((dir = mkdtempSync(join(tmpdir(), "brainstem-engine-"))), "session.ndjson");
+    const journal = openJournal(journalPath);
+    const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir, cache, budgets: { maxModelCalls: 0 } });
+
+    // maxModelCalls: 0 only bounds noteModelCall()'s counter, which nothing in
+    // this test calls — this exercises the ordering guarantee (cache checked
+    // before the budget gate) using a deliberately exhausted budget context.
+    engine.noteModelCall();
+    const blocked = await engine.gate({ tool: "bash", command: "echo hi", task: "t" });
+    expect(blocked.action).toBe("ask"); // budget-exhausted fallback, no SystemOne call
+    expect(mock.calls).toHaveLength(0);
+  });
+
+  test("in-flight requests for the same key are deduplicated into one SystemOne call", async () => {
+    const cache = new BoundedAnswerCache();
+    const { systemOne, release, callCount } = deferredSystemOne();
+    const journalPath = join((dir = mkdtempSync(join(tmpdir(), "brainstem-engine-"))), "session.ndjson");
+    const journal = openJournal(journalPath);
+    const engine = new ReflexEngine({ systemOne, journal, policy: POLICY, root: dir, cache });
+
+    const p1 = engine.gate({ tool: "bash", command: "echo hi", task: "t" });
+    const p2 = engine.gate({ tool: "bash", command: "echo hi", task: "t" });
+    await Promise.resolve(); // let both requests reach the in-flight check
+    expect(callCount()).toBe(1);
+
+    release(gateScript({})());
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1.action).toBe("auto");
+    expect(r2.action).toBe("auto");
+    expect(callCount()).toBe(1);
   });
 });
