@@ -114,6 +114,37 @@ describe("journal (schema v2)", () => {
     expect(events[2]?.t === "artifacts" && events[2].captureComplete).toBe(true);
   });
 
+  test("artifacts event round-trips the F2 focus fields, and a legacy shape without them still parses", () => {
+    const path = tmpPath("focus-fields.ndjson");
+    const withFocus = {
+      t: "artifacts",
+      v: 2,
+      artifactId: "art_2",
+      ts: 4,
+      toolCallId: "tc10",
+      contentHash: "h2",
+      captureComplete: true,
+      byteCount: 500,
+      sectionManifestHash: "sect_hash",
+      focusRollout: "on",
+      focusMode: "select",
+      focusStatus: "ok",
+    };
+    const legacy = { t: "artifacts", v: 2, artifactId: "art_3", ts: 5, toolCallId: "tc11", contentHash: "h3", captureComplete: false, byteCount: 10 };
+    writeFileSync(path, [withFocus, legacy].map((l) => JSON.stringify(l)).join("\n") + "\n", "utf8");
+
+    const events = loadJournal(path);
+    const first = events[0];
+    expect(first?.t === "artifacts" && first.focusRollout).toBe("on");
+    expect(first?.t === "artifacts" && first.focusMode).toBe("select");
+    expect(first?.t === "artifacts" && first.focusStatus).toBe("ok");
+    expect(first?.t === "artifacts" && first.sectionManifestHash).toBe("sect_hash");
+
+    const second = events[1];
+    expect(second?.t === "artifacts" && second.focusRollout).toBeUndefined();
+    expect(second?.t === "artifacts" && second.captureComplete).toBe(false);
+  });
+
   test("loadJournal throws a clear error on unknown schema versions", () => {
     const path = tmpPath("v1.ndjson");
     writeFileSync(path, JSON.stringify({ t: "session_start", ts: 1, trust: 0.3 }) + "\n", "utf8");

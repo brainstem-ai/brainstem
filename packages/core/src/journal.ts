@@ -113,6 +113,12 @@ export type JournalEvent =
       byteCount: number;
       presentedViewHash?: string;
       sectionManifestHash?: string;
+      // Present only when Focus actually ran (focusMode !== "off"); never "off"
+      // itself — this is the harness's configured rollout for THIS call.
+      focusRollout?: "shadow" | "on";
+      // The FocusDecision's own outcome — distinct from focusRollout above.
+      focusMode?: "full" | "select" | "compute_or_retrieve";
+      focusStatus?: "ok" | "partial" | "unavailable";
     }
   | {
       t: "capability_set";
