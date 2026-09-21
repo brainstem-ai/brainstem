@@ -8,6 +8,7 @@
     "exp:timing": "bun run experiments/03-batch-timing.ts",
     "exp:sanitize": "bun run experiments/04-sanitize.ts",
     "eval:live": "bun run experiments/evals/live-scenarios.ts",
+    "eval:cache-benchmark": "bun run experiments/evals/cache-benchmark.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

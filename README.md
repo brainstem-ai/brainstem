@@ -101,6 +101,10 @@ Re-scores recorded judgments offline against a different policy, resolved strict
 
 `--mode reevaluate` (new live judgment calls, not offline reuse of recorded scores) is recognized but not implemented — it exits with an explicit error rather than silently no-op'ing. `--mode policy` (default) never makes an API call. Side effects and human approvals are never replayed; approval remains a recorded historical outcome that a changed policy cannot manufacture.
 
+## Answer cache
+
+Every reflex — gate, sanitize, verify, pulse, steer, select, focus — shares one bounded, in-memory exact-answer cache by default (no configuration needed; pass `answerCache` to `createHarness` to override or disable). A judgment is cached only on success and is checked *before* any budget gate, since reuse costs zero new provider calls; on a hit, the cached answers are re-validated against the current question table before use, and a stale/incompatible entry silently falls through to a fresh call rather than surfacing as a new failure. Concurrent identical requests are deduplicated into one in-flight call. Journal `reflex` events record `cacheHit`/`cachedFromJudgmentId` so a cache hit's provenance stays distinguishable from a fresh one. See `docs/tasks/p10.md` for what's covered and what's deliberately deferred (gate batching, pulse/steer/select fusion, a buffered journal sink, gate prefetch, journal seeding).
+
 ## Versions
 
 The `@earendil-works/pi-*` dependencies (0.86.1) are pinned deliberately; upgrades are explicit checks.

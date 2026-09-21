@@ -56,6 +56,9 @@ export type JournalEvent =
       questions: Record<string, Question>;
       result: AskResult | null;
       reason?: string;
+      // Present only on a cache hit — absent (not `false`) on every fresh call.
+      cacheHit?: boolean;
+      cachedFromJudgmentId?: string;
     }
   | {
       t: "decision";

@@ -130,3 +130,5 @@ export type {
   FocusInput,
   FocusDecision,
 } from "./output-focus";
+export { computeCacheKey, BoundedAnswerCache } from "./cache";
+export type { AnswerCache, AnswerCacheEntry, BoundedAnswerCacheOptions } from "./cache";
