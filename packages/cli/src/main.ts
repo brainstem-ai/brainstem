@@ -2,7 +2,7 @@
 import { createInterface } from "node:readline";
 import { createModels } from "@earendil-works/pi-ai";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
-import { DEFAULT_TRUST, jevSystemOne, loadJournal, policyForTrust } from "@brainstem/core";
+import { DEFAULT_TRUST, jevSystemOne, loadJournal, policyForTrust, type ApprovalHandler, type ApprovalRequest, type ApprovalResolution } from "@brainstem/core";
 import { createHarness } from "./harness";
 import { resolveModels, type ResolvedModels } from "./models";
 import { replayJournal } from "./replay";
@@ -140,6 +140,28 @@ Usage:
   console.log(`brainstem · trust ${args.trust} · model ${args.model} · reflexes ${systemOne.name}`);
   console.log(`journal: ${journalPath}`);
 
+  let pendingApproval: { resolve: (r: ApprovalResolution) => void; reject: (e: Error) => void } | undefined;
+  const promptQueue: string[] = [];
+  const steerQueue: string[] = [];
+
+  // One input controller, two modes: while an approval is pending, stdin
+  // resolves the approval (y/yes/approve → approve_once; n/no/deny or empty →
+  // deny; anything else is queued as a task update); otherwise stdin is a task
+  // prompt. Approval answers never become task messages and vice versa.
+  const approvalHandler: ApprovalHandler = (req: ApprovalRequest) =>
+    new Promise<ApprovalResolution>((resolve, reject) => {
+      const reqArgs = (req.validatedArgs ?? {}) as { command?: string; path?: string };
+      console.error(`[brainstem] approval needed: ${req.tool}`);
+      if (reqArgs.command !== undefined) console.error(`  command: ${reqArgs.command}`);
+      if (reqArgs.path !== undefined) console.error(`  path: ${reqArgs.path}`);
+      console.error(`  cwd: ${req.cwd}`);
+      console.error(`  reasons: ${req.reasons.join("; ")}`);
+      console.error(
+        `approve once? y/yes/approve · n/no/deny or empty line denies · any other input is queued as a task update · ctrl+d cancels`,
+      );
+      pendingApproval = { resolve, reject };
+    });
+
   const harness = createHarness({
     systemOne,
     streamFn: models.streamSimple.bind(models),
@@ -148,26 +170,103 @@ Usage:
     trust: args.trust,
     journalPath,
     cwd: args.cwd,
+    approvalHandler: args.task ? undefined : approvalHandler,
     onReflex: (line) => console.error(renderReflex(line)),
     onDelta: (delta) => process.stdout.write(delta),
   });
+
+  function deliverQueuedUpdate(text: string): void {
+    if (harness.recorder.currentTask) harness.recorder.updateTask(text);
+    else harness.recorder.startTask(text);
+    harness.agent.steer({ role: "user", content: [{ type: "text", text }], timestamp: Date.now() });
+  }
+
+  function resolvePendingApproval(input: string): void {
+    const pending = pendingApproval;
+    if (!pending) return;
+    if (/^(?:y|yes|approve)$/i.test(input)) {
+      pendingApproval = undefined;
+      pending.resolve("approve_once");
+    } else if (input.length === 0 || /^(?:n|no|deny)$/i.test(input)) {
+      pendingApproval = undefined;
+      pending.resolve("deny");
+    } else {
+      console.log("queued until current action resolves");
+      steerQueue.push(input);
+      return;
+    }
+    for (const queued of steerQueue.splice(0)) deliverQueuedUpdate(queued);
+  }
+
+  async function pumpPrompts(): Promise<void> {
+    while (promptQueue.length > 0) {
+      const text = promptQueue.shift()!;
+      process.stdout.write("\n");
+      try {
+        await harness.prompt(text);
+      } catch (err) {
+        harness.endSession("error", err instanceof Error ? err.message : String(err));
+        console.error(err);
+        process.exit(1);
+      }
+      process.stdout.write("\n");
+    }
+  }
 
   try {
     if (args.task) {
       await harness.prompt(args.task);
       process.stdout.write("\n");
+      if (harness.approvalsRequested() > 0) {
+        harness.endSession("normal");
+        console.error("approval required");
+        process.exit(3);
+      }
       return;
     }
 
     console.log("type a task, ctrl+d to exit");
     const rl = createInterface({ input: process.stdin });
-    for await (const line of rl) {
+    let stdinClosed = false;
+    let running = false;
+
+    rl.on("line", (line) => {
       const trimmed = line.trim();
-      if (trimmed.length === 0) continue;
-      process.stdout.write("\n");
-      await harness.prompt(trimmed);
-      process.stdout.write("\n");
-    }
+      if (pendingApproval) {
+        resolvePendingApproval(trimmed);
+        return;
+      }
+      if (running) {
+        if (trimmed.length > 0) {
+          console.log("queued until current action resolves");
+          promptQueue.push(trimmed);
+        }
+        return;
+      }
+      if (trimmed.length > 0) promptQueue.push(trimmed);
+      running = true;
+      void pumpPrompts().then(() => {
+        running = false;
+      });
+    });
+
+    rl.on("close", () => {
+      stdinClosed = true;
+      const pending = pendingApproval;
+      if (pending) {
+        pendingApproval = undefined;
+        pending.reject(new Error("stdin closed while approval pending"));
+      }
+    });
+
+    await new Promise<void>((resolve) => {
+      const timer = setInterval(() => {
+        if (stdinClosed && !running && promptQueue.length === 0) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 50);
+    });
     harness.endSession("normal");
   } catch (err) {
     harness.endSession("error", err instanceof Error ? err.message : String(err));

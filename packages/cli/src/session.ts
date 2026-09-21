@@ -63,6 +63,12 @@ export class SessionRecorder {
     return Date.now() - this.startedAt;
   }
 
+  // Task identity rule: every harness.prompt starts a new task — a prompt while
+  // the agent is idle starts one, and so does a prompt while another run is in
+  // flight (task per prompt). The one exception is input queued while an
+  // approval is pending: once the approval resolves, the harness delivers the
+  // queued text via agent.steer and records it with updateTask, which appends a
+  // task_update and bumps the revision without ever overwriting the objective.
   startTask(objective: string): TaskState {
     const task: TaskState = { id: newId("task"), revision: 1, objective, updates: [] };
     this.currentTaskState = task;
