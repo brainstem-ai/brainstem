@@ -27,6 +27,21 @@ export interface Policy {
   steer: {
     miniConfidence: number;
   };
+  jev: {
+    deadlineMs: number;
+    // Reserved for P10; this unit keeps retries disabled.
+    retries: number;
+    breaker: {
+      threshold: number;
+      cooldownMs: number;
+      probe: number;
+    };
+  };
+  budgets: {
+    maxModelCalls?: number;
+    maxElapsedMs?: number;
+    maxSpendUsd?: number;
+  };
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -58,5 +73,15 @@ export function policyForTrust(trust: number): Policy {
   steer: {
     miniConfidence: 0.6,
   },
+  jev: {
+    deadlineMs: 1500,
+    retries: 0,
+    breaker: {
+      threshold: 3,
+      cooldownMs: 10000,
+      probe: 1,
+    },
+  },
+  budgets: {},
 };
 }

@@ -43,9 +43,19 @@ export interface AskResult {
   answers: Record<string, Answer>;
 }
 
+export interface AskOptions {
+  signal?: AbortSignal;
+  deadlineMs?: number;
+}
+
+export type JudgmentOutcome =
+  | { status: "completed"; result: AskResult }
+  | { status: "unavailable"; reason: string }
+  | { status: "cancelled"; reason: string };
+
 export interface SystemOne {
   readonly name: string;
-  ask(state: unknown, questions: Record<string, Question>): Promise<AskResult>;
+  ask(state: unknown, questions: Record<string, Question>, options?: AskOptions): Promise<AskResult>;
 }
 
 export function noul(instructions: string, criteria?: { true: string; false: string }): NoulQuestion {
