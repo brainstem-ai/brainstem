@@ -31,6 +31,23 @@ Measured on 2026-09-21 against `zai/glm-5.3` + `jev-1.13.0`: **$0.0043 total** f
 
 Set `BRAINSTEM_EVAL_MODEL=provider/id` to run against a different main model.
 
+## Shipped Focus vs RTK
+
+```sh
+bun run eval:focus-vs-rtk
+```
+
+Real calls (12, one Jev focus judgment per case), small cost. The `output-focus` pilot below validated the *concept* with a standalone experiment script; this reuses the pilot's own real captures, real tasks, and recorded RTK sizes, but runs them through the *actually shipped* `engine.focus()` / `presentArtifact()` code — the functions really wired into `harness.ts`. Grounding is checked by substring match against each case's known-correct answer text, not a full downstream model call+grade.
+
+Measured 2026-09-21, across all 12 pilot cases:
+
+| | raw | RTK | shipped Focus |
+|---|---|---|---|
+| total chars | 80,616 | 43,923 (45.5% reduction) | 13,420 (83.4% reduction vs raw, 69.4% smaller than RTK) |
+| evidence kept | — | — | 9/11 groundable cases (2 misses; 1 case is a negative control) |
+
+This run also found and fixed a real bug (see the `output-focus.ts` git history around 2026-09-21): the exhaustive-bypass regex matched bare "exact"/"exactly" as an exhaustiveness cue, so most of these precision-seeking tasks ("what exact value...") were wrongly routed to the naive full-view bypass instead of a real selection. Before the fix, only 4/11 cases kept their required evidence. The two remaining misses are real Jev judgment calls that scored below threshold — in the actual harness (not this simplified test) that means `compute_or_retrieve` mode and a recovery-tool prompt, not silently lost evidence; F0's `read_output`/`search_output` guarantee nothing is truly gone. This script doesn't simulate that follow-up turn, so its "missing evidence" count is a stricter bar than what the real harness would ultimately deliver.
+
 ## Select value
 
 ```sh
