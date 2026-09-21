@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 import { createInterface } from "node:readline";
 import { createModels } from "@earendil-works/pi-ai";
-import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { zaiProvider } from "@earendil-works/pi-ai/providers/zai";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { DEFAULT_TRUST, jevSystemOne, loadJournal, policyForTrust } from "@brainstem/core";
 import { createHarness } from "./harness";
+import { resolveModels, type ResolvedModels } from "./models";
 import { replayJournal } from "./replay";
 
 interface Args {
@@ -97,12 +96,27 @@ Usage:
             [--journal path] [--task "..."] [--cwd path]
   brainstem replay <journal.ndjson> [--trust 0..1]
 
-  --trust N        autonomy dial, 0 = ask about everything, 1 = act on confidence (default 0.3)
+  --trust N        confidence bar for auto-running (0 = most cautious, 1 = most autonomous; default 0.3). Safety thresholds never change.
   --mini-model id  smaller model for steer routing (default zai/glm-5.3-flash)
   --task "..."     one-shot mode: run a single task and exit
   --journal p      NDJSON journal path (reflex answers, decisions, tool calls)
   replay           re-score a recorded journal against a new trust level (no API calls)`);
     return;
+  }
+
+  if (!Number.isFinite(args.trust) || args.trust < 0 || args.trust > 1) {
+    console.error(`--trust must be a number between 0 and 1, got ${args.trust}`);
+    process.exit(1);
+  }
+  for (let i = 0; i < process.argv.length; i++) {
+    const a = process.argv[i]!;
+    if (/-(timeout|deadline)$/.test(a)) {
+      const v = Number(process.argv[i + 1]);
+      if (!(Number.isFinite(v) && v > 0)) {
+        console.error(`${a} must be a positive number, got ${process.argv[i + 1]}`);
+        process.exit(1);
+      }
+    }
   }
 
   if (!process.env.TYPESAFE_API_KEY) {
@@ -111,27 +125,14 @@ Usage:
   }
 
   const models = createModels();
-  const [providerId = "", modelId = ""] = args.model.split("/");
-  if (providerId === "anthropic") models.setProvider(anthropicProvider());
-  if (providerId === "zai") models.setProvider(zaiProvider());
-  const model = models.getModel(providerId, modelId);
-  if (!model) {
-    console.error(`unknown model ${args.model}`);
+  let resolved: ResolvedModels;
+  try {
+    resolved = resolveModels(models, args.model, args.miniModel);
+  } catch (err) {
+    console.error((err as Error).message);
     process.exit(1);
   }
-
-  let miniModel: ReturnType<typeof models.getModel> = undefined;
-  const [miniProvider = "", miniId = ""] = args.miniModel.split("/");
-  if (miniProvider === providerId) {
-    miniModel = model;
-  } else {
-    if (miniProvider === "anthropic") models.setProvider(anthropicProvider());
-    if (miniProvider === "zai") models.setProvider(zaiProvider());
-    miniModel = miniId ? models.getModel(miniProvider, miniId ?? "") : undefined;
-  }
-  if (!miniModel) {
-    console.error(`mini model ${args.miniModel} not found — steering disabled`);
-  }
+  const { main: model, mini: miniModel } = resolved;
 
   const journalPath = expandHome(args.journal);
   const systemOne = jevSystemOne(new TypeSafeClient());

@@ -58,7 +58,8 @@ export function createHarness(options: HarnessOptions): Harness {
     systemOne: options.systemOne,
     journal,
     policy,
-    environment: `Working directory: ${options.cwd}. A git repository with a Node.js/TypeScript toolchain. A local Postgres dev database may be running.`,
+    root: options.cwd,
+    environment: `Working directory: ${options.cwd}. A git repository.`,
   });
 
   let task = "unspecified";
@@ -113,6 +114,7 @@ export function createHarness(options: HarnessOptions): Harness {
       thinkingLevel: options.thinkingLevel ?? "low",
     },
     streamFn: routedStreamFn,
+    toolExecution: "sequential",
     shouldStopAfterTurn: async () => {
       turnsCompleted += 1;
       const every = options.pulseEveryTurns ?? 3;
@@ -161,7 +163,7 @@ export function createHarness(options: HarnessOptions): Harness {
       }
 
       if (toolCall.name === "read" || toolCall.name === "grep" || toolCall.name === "glob") {
-        const verdict = staticVerdict(toolCall.name, { path: a.path });
+        const verdict = staticVerdict(toolCall.name, { path: a.path }, options.cwd);
         if (verdict !== null) {
           journal.append({
             t: "decision",

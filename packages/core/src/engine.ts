@@ -181,6 +181,7 @@ export interface ReflexEngineDeps {
   journal: Journal;
   policy?: Policy;
   environment?: string;
+  root: string;
 }
 
 export class ReflexEngine {
@@ -188,16 +189,18 @@ export class ReflexEngine {
   private readonly journal: Journal;
   readonly policy: Policy;
   private readonly environment: string;
+  private readonly root: string;
 
   constructor(deps: ReflexEngineDeps) {
     this.systemOne = deps.systemOne;
     this.journal = deps.journal;
     this.policy = deps.policy ?? policyForTrust(0.3);
     this.environment = deps.environment ?? "A git repository in the current working directory.";
+    this.root = deps.root;
   }
 
   async gate(input: GateInput): Promise<GateDecision & { result?: AskResult }> {
-    const floor = staticVerdict(input.tool, { command: input.command, path: input.path });
+    const floor = staticVerdict(input.tool, { command: input.command, path: input.path }, this.root);
 
     if (floor === "deny") {
       const decision: GateDecision = { action: "deny", reasons: ["static floor: dangerous pattern"] };

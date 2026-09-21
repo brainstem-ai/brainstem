@@ -43,7 +43,7 @@ function engineWith(script: (state: unknown, questions: Record<string, Question>
   dir = mkdtempSync(join(tmpdir(), "brainstem-engine-"));
   const journalPath = join(dir, "session.ndjson");
   const journal = openJournal(journalPath);
-  const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY });
+  const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir });
   return { mock, journalPath, engine };
 }
 

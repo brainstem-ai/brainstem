@@ -6,6 +6,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 const OUTPUT_CAP = 50_000;
 const READ_CAP = 100_000;
+const BASH_STREAM_CAP = 256_000;
 
 export interface ToolDeps {
   cwd: string;
@@ -30,28 +31,85 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
       command: Type.String({ description: "The shell command to run" }),
       timeout_ms: Type.Optional(Type.Number({ description: "Timeout in milliseconds (default 60000)" })),
     });
+
+  function collectStream(stream: NodeJS.ReadableStream, limit: number): Promise<{ text: string; truncated: boolean }> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      let total = 0;
+      let retained = 0;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve({ text: Buffer.concat(chunks).toString("utf8"), truncated: total > limit });
+      };
+      stream.on("data", (d: Buffer) => {
+        total += d.length;
+        if (retained < limit) {
+          const take = Math.min(d.length, limit - retained);
+          chunks.push(d.subarray(0, take));
+          retained += take;
+        }
+      });
+      stream.on("end", finish);
+      stream.on("close", finish);
+      stream.on("error", finish);
+    });
+  }
+
   const bash: AgentTool<typeof bashParams> = {
     name: "bash",
     label: "Bash",
     description: "Run a shell command in the project directory and return its output.",
     parameters: bashParams,
     execute: async (_id, params, signal) => {
-      const timeout = AbortSignal.timeout(params.timeout_ms ?? 60_000);
+      const started = performance.now();
+      const timeoutSignal = AbortSignal.timeout(params.timeout_ms ?? 60_000);
+      const kill = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
       const child = spawn("/bin/bash", ["-lc", params.command], {
         cwd: deps.cwd,
         stdio: ["ignore", "pipe", "pipe"],
-        signal: signal ?? timeout,
+        signal: kill,
       });
-      const [stdout, stderr, code] = await Promise.all([
-        new Promise<string>((resolve) => { child.stdout!.on("data", (d) => resolve(String(d))); child.stdout!.on("end", () => resolve("")); }),
-        new Promise<string>((resolve) => { child.stderr!.on("data", (d) => resolve(String(d))); child.stderr!.on("end", () => resolve("")); }),
-        new Promise<number>((resolve) => child.on("close", (c) => resolve(c ?? -1))),
-      ]);
-      const output = cap(`${stdout}${stderr}`.trim(), OUTPUT_CAP);
-      if (code !== 0) {
-        throw new Error(`exit ${code}: ${output}`);
+      const stdout = collectStream(child.stdout!, BASH_STREAM_CAP);
+      const stderr = collectStream(child.stderr!, BASH_STREAM_CAP);
+      const spawnError = new Promise<Error | undefined>((resolve) => {
+        child.on("error", (err) => resolve(err));
+        child.on("close", () => resolve(undefined));
+      });
+      const code = await new Promise<number>((resolve) => {
+        child.on("close", (c) => resolve(c ?? -1));
+        child.on("error", () => {
+          if (child.exitCode === null && child.signalCode === null) resolve(-1);
+        });
+      });
+      const [out, err, error] = await Promise.all([stdout, stderr, spawnError]);
+      child.removeAllListeners();
+      const durationMs = Math.round(performance.now() - started);
+      const combined = cap(`${out.text}${err.text}`.trim(), OUTPUT_CAP);
+      const truncated = out.truncated || err.truncated;
+
+      // Node emits an AbortError on the child when the kill signal fires; only
+      // non-abort errors are spawn-level failures.
+      if (error && !signal?.aborted && !timeoutSignal.aborted) {
+        return {
+          content: [{ type: "text", text: cap(`${error.message}\n${err.text}`.trim(), OUTPUT_CAP) || "(no output)" }],
+          details: { exit: -1, status: "error" as const, durationMs, truncated },
+        };
       }
-      return { content: [{ type: "text", text: output || "(no output)" }], details: { exit: code } };
+
+      const status = signal?.aborted
+        ? ("cancelled" as const)
+        : timeoutSignal.aborted
+          ? ("timeout" as const)
+          : code === 0
+            ? ("ok" as const)
+            : ("error" as const);
+
+      return {
+        content: [{ type: "text", text: combined || "(no output)" }],
+        details: { exit: code, status, durationMs, truncated },
+      };
     },
   };
 
@@ -63,6 +121,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     label: "Read File",
     description: "Read a file's contents.",
     parameters: readParams,
+    executionMode: "parallel",
     execute: async (_id, params) => {
       const path = join(deps.cwd, params.path);
       const text = readFileSync(path, "utf8");
@@ -108,6 +167,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     label: "Grep",
     description: "Search file contents with a regular expression.",
     parameters: grepParams,
+    executionMode: "parallel",
     execute: async (_id, params) => {
       const base = join(deps.cwd, params.path ?? ".");
       const re = new RegExp(params.pattern);
@@ -142,6 +202,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     label: "Glob",
     description: "List files matching a glob pattern.",
     parameters: globParams,
+    executionMode: "parallel",
     execute: async (_id, params) => {
       const re = globToRegex(params.pattern);
       const files: string[] = [];
