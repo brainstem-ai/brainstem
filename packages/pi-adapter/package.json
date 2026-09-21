@@ -1,0 +1,17 @@
+{
+  "name": "@brainstem/pi-adapter",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@brainstem/reflexes": "workspace:*"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": ">=0.86.1"
+  },
+  "devDependencies": {
+    "@brainstem/core": "workspace:*",
+    "@earendil-works/pi-agent-core": "0.86.1",
+    "@earendil-works/pi-ai": "0.86.1"
+  }
+}
