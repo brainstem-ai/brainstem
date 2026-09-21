@@ -78,21 +78,24 @@ Each row is a reviewable implementation unit. Update this checklist as work land
 | P8 | Skill loading, discovery, and dynamic context integration | P5, P7 | Landed |
 | F0 | Bounded output artifacts and recovery tools | P1, P2, P4 | Landed |
 | F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 | Landed |
-| F2 | Focus integration and controlled rollout | P8, F1 | Not started |
+| F2 | Focus integration and controlled rollout | P8, F1 | Landed |
 | P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 | Not started |
 | P10 | Measured caching, batching, and journal improvements | P9 | Not started |
 | P11 | Tend: deliberate provider-aware compaction checkpoints | P8, F2, P9; experimental | Not started |
 
 Select (P7) turns Jev judgments into `evaluated`/`recommended` bitmaps, and P8
-now consumes them: `harness.ts` instantiates a `SelectDriver`, resolves the
-active set through `prepareNextTurnWithContext` at each turn boundary, adds
+consumes them: `harness.ts` instantiates a `SelectDriver`, resolves the active
+set through `prepareNextTurnWithContext` at each turn boundary, adds
 `find_capabilities` for on-demand discovery (with pin/unpin, not `explicit`),
 and loads skills from configured `--skill-root` directories as appended system
-messages that never replace the harness's own system prompt. F1 lands the
-Focus mechanism itself (structural section splitting with UTF-8 byte offsets,
-Jev relevance scoring, budget-aware selection) as pure `packages/core`, not yet
-wired into the tool-result pipeline — F2 replaces the fixed-line-count
-presented view with a Focus-driven one and depends on this unit's types.
+messages that never replace the harness's own system prompt. F1 built the
+Focus mechanism (structural section splitting with UTF-8 byte offsets, Jev
+relevance scoring, budget-aware selection) as pure `packages/core`, and F2 now
+wires it into `afterToolCall` behind `--focus-mode off|shadow|on` (default
+`off`, a byte-for-byte no-op). F2 also fixed a real defect while integrating:
+sanitize previously judged up to 8,000 raw characters of a capture regardless
+of what the presented view actually bounded it to; it now judges the exact
+delivered content in every mode, focused or not.
 
 Develop evaluation fixtures alongside each feature, then assemble the comparison suite in P9. Dependencies express sequencing, not a requirement to delegate to multiple agents.
 
@@ -495,13 +498,13 @@ Required integration scenarios before calling this iteration complete:
 - [x] Every delivered tool-output excerpt has been checked, including error output and paginated tails.
 - [x] Verification distinguishes an intentionally reproduced failure from an unhelpful result.
 - [x] Main/mini routing changes the actual model, or skips routing when identical.
-- [ ] Capability selection supports none/one/many, dependencies, explicit requirements, and discovery recovery.
+- [x] Capability selection supports none/one/many, dependencies, explicit requirements, and discovery recovery.
 - [x] Bitmap serialization, version validation, and catalog remapping are correct beyond 32 and 64 entries.
-- [ ] Generic output sections preserve exact evidence, source identity, dependencies, and tested Unicode offsets.
-- [ ] Exhaustive requests bypass selective focusing; computations use code rather than Jev counting.
+- [x] Generic output sections preserve exact evidence, source identity, dependencies, and tested Unicode offsets.
+- [x] Exhaustive requests bypass selective focusing; computations use code rather than Jev counting.
 - [x] Omitted output is recoverable without rerunning commands; capture truncation and expiry are explicit.
-- [ ] Focusing changes only new presented results, and recovery receives normal sanitization.
-- [ ] The provider sees the intended tools/skills on initial calls, later turns, and subsequent user prompts.
+- [x] Focusing changes only new presented results, and recovery receives normal sanitization.
+- [x] The provider sees the intended tools/skills on initial calls, later turns, and subsequent user prompts.
 - [ ] Tool/skill changes and checkpoints respect provider cache/opaque-reasoning contracts, not only tool pairing.
 - [ ] Journal v2 explains each decision and original-policy replay reproduces it.
 - [x] Outages follow the documented fallback table; hard budgets remain independent of Jev.
