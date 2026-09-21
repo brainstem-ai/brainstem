@@ -30,3 +30,11 @@ This is not the plan's full "Evaluation" subsection. Explicitly not built here, 
 Measured on 2026-09-21 against `zai/glm-5.3` + `jev-1.13.0`: **$0.0043 total** for all three scenarios (main-model side; Jev's dollar cost isn't exposed by the TypeSafe API, only token counts — ~2,700 tokens total across both judgment calls per run). Costs will vary with model pricing and prompt size; this isn't a guarantee for future runs.
 
 Set `BRAINSTEM_EVAL_MODEL=provider/id` to run against a different main model.
+
+## Cache benchmark
+
+```sh
+bun run eval:cache-benchmark
+```
+
+Also real calls, also small cost (three bare Jev calls, no main-model calls at all). Demonstrates one narrow, honest fact about P10's exact-answer cache: an identical repeated judgment (same task, same tool, same content) skips the network round-trip entirely on the second ask. Measured 2026-09-21: a fresh call took ~180ms; the cached repeat took ~1ms; without a cache, both calls made a real Jev request. This is not a general "the harness got N% faster" claim — it only tells you the cache does what it says for exact repeats, which is the actual scenario it targets (P10's other five sub-items — batching, fusion, prefetch, journal sink, journal seeding — remain deferred; see the P10 task doc's scope note).

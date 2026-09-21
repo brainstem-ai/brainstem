@@ -1,5 +1,6 @@
 import { checkBudgets, type BudgetCheck, type BudgetLimits } from "./budgets";
 import { createBitmap, popcount, type CapabilityBitmap } from "./bitmap";
+import { computeCacheKey, type AnswerCache } from "./cache";
 import { hashAction, newId } from "./evidence";
 import type { CapabilityCatalog } from "./capabilities";
 import type { ToolStatus } from "./evidence";
@@ -329,6 +330,7 @@ export interface ReflexEngineDeps {
   knownSpendUsd?: number;
   signal?: AbortSignal;
   now?: () => number;
+  cache?: AnswerCache;
 }
 
 type Judgment = JudgmentOutcome & {
@@ -350,6 +352,8 @@ export class ReflexEngine {
   private readonly signal?: AbortSignal;
   private readonly now: () => number;
   private readonly startedAt: number;
+  private readonly cache?: AnswerCache;
+  private readonly inFlight = new Map<string, Promise<Judgment>>();
   private modelCalls = 0;
   private lastPulseIntervention: string | undefined;
 
@@ -366,6 +370,7 @@ export class ReflexEngine {
     this.signal = deps.signal;
     this.now = deps.now ?? Date.now;
     this.startedAt = this.now();
+    this.cache = deps.cache;
   }
 
   noteModelCall(): void {
@@ -391,6 +396,25 @@ export class ReflexEngine {
     return `budget exceeded: ${check.breached.join(", ")}`;
   }
 
+  // Non-throwing re-validation for a cache hit: a schema mismatch on reuse
+  // (e.g. the question table changed shape since this was cached) falls
+  // through to a fresh call rather than becoming a new failure mode the
+  // cache itself introduces.
+  private tryRevalidate(
+    questions: Record<string, Question>,
+    cachedAnswers: Record<string, Answer>,
+    groups?: Record<string, string[]>,
+  ): Record<string, Answer> | undefined {
+    try {
+      if (!groups) return validateAnswers(questions, cachedAnswers);
+      const { groups: valid, errors } = validateGroups(questions, cachedAnswers, groups);
+      if (Object.keys(errors).length > 0) return undefined;
+      return Object.assign({}, ...Object.values(valid)) as Record<string, Answer>;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async request(
     reflex: string,
     subject: string,
@@ -399,9 +423,30 @@ export class ReflexEngine {
     groups?: Record<string, string[]>,
   ): Promise<Judgment> {
     const judgmentId = this.makeId();
-    const record = (status: ReflexStatus, result: AskResult | null, reason?: string): void => {
-      this.recordReflex(reflex, subject, state, questions, result, judgmentId, status, reason);
+    const record = (
+      status: ReflexStatus,
+      result: AskResult | null,
+      reason?: string,
+      cacheProvenance?: { cachedFromJudgmentId: string },
+    ): void => {
+      this.recordReflex(reflex, subject, state, questions, result, judgmentId, status, reason, cacheProvenance);
     };
+
+    const cacheKey = this.cache ? computeCacheKey(this.systemOne.name, state, questions) : undefined;
+
+    // Checked before the budget gate: a hit makes zero new provider calls, so
+    // it must never be blocked by a budget that exists to bound new spend,
+    // time, or call count.
+    if (cacheKey !== undefined) {
+      const cached = this.cache!.get(cacheKey);
+      if (cached) {
+        const answers = this.tryRevalidate(questions, cached.answers, groups);
+        if (answers !== undefined) {
+          record("completed", cached.result, undefined, { cachedFromJudgmentId: cached.originalJudgmentId });
+          return { status: "completed", result: cached.result, judgmentId, answers };
+        }
+      }
+    }
 
     const budget = this.budgetReason();
     if (budget !== null) {
@@ -409,34 +454,57 @@ export class ReflexEngine {
       return { status: "unavailable", reason: budget, judgmentId };
     }
 
-    try {
-      const result = await this.systemOne.ask(state, questions, this.askOptions());
-      if (!groups) {
-        const answers = validateAnswers(questions, result.answers);
-        record("completed", result);
-        return { status: "completed", result, judgmentId, answers };
-      }
-      const { groups: valid, errors } = validateGroups(questions, result.answers, groups);
-      if (Object.keys(errors).length === 0) {
-        const answers = Object.assign({}, ...Object.values(valid)) as Record<string, Answer>;
-        record("completed", result);
-        return { status: "completed", result, judgmentId, answers };
-      }
-      const reason = Object.entries(errors)
-        .map(([name, message]) => `${name}: ${message}`)
-        .join("; ");
-      record("unavailable", null, reason);
-      return { status: "unavailable", reason, judgmentId, groups: valid };
-    } catch (error) {
-      if (error instanceof JevCancelledError) {
-        record("cancelled", null, error.message);
-        return { status: "cancelled", reason: error.message, judgmentId };
-      }
-      const reason =
-        error instanceof JevUnavailableError ? error.message : `judgment failed: ${error instanceof Error ? error.message : String(error)}`;
-      record("unavailable", null, reason);
-      return { status: "unavailable", reason, judgmentId };
+    if (cacheKey !== undefined) {
+      const pending = this.inFlight.get(cacheKey);
+      if (pending) return pending;
     }
+
+    const attempt = (async (): Promise<Judgment> => {
+      try {
+        const result = await this.systemOne.ask(state, questions, this.askOptions());
+        if (!groups) {
+          const answers = validateAnswers(questions, result.answers);
+          record("completed", result);
+          if (cacheKey !== undefined) {
+            this.cache!.set(cacheKey, { answers, result, originalJudgmentId: judgmentId, cachedAt: this.now() });
+          }
+          return { status: "completed", result, judgmentId, answers };
+        }
+        const { groups: valid, errors } = validateGroups(questions, result.answers, groups);
+        if (Object.keys(errors).length === 0) {
+          const answers = Object.assign({}, ...Object.values(valid)) as Record<string, Answer>;
+          record("completed", result);
+          if (cacheKey !== undefined) {
+            this.cache!.set(cacheKey, { answers, result, originalJudgmentId: judgmentId, cachedAt: this.now() });
+          }
+          return { status: "completed", result, judgmentId, answers };
+        }
+        const reason = Object.entries(errors)
+          .map(([name, message]) => `${name}: ${message}`)
+          .join("; ");
+        record("unavailable", null, reason);
+        return { status: "unavailable", reason, judgmentId, groups: valid };
+      } catch (error) {
+        if (error instanceof JevCancelledError) {
+          record("cancelled", null, error.message);
+          return { status: "cancelled", reason: error.message, judgmentId };
+        }
+        const reason =
+          error instanceof JevUnavailableError ? error.message : `judgment failed: ${error instanceof Error ? error.message : String(error)}`;
+        record("unavailable", null, reason);
+        return { status: "unavailable", reason, judgmentId };
+      }
+    })();
+
+    if (cacheKey !== undefined) {
+      const key = cacheKey;
+      this.inFlight.set(key, attempt);
+      void attempt.finally(() => {
+        if (this.inFlight.get(key) === attempt) this.inFlight.delete(key);
+      });
+    }
+
+    return attempt;
   }
 
   private fallbackGate(floor: StaticVerdict, cause: string): GateDecision {
@@ -771,6 +839,7 @@ export class ReflexEngine {
     judgmentId: string,
     status: ReflexStatus = "completed",
     reason?: string,
+    cacheProvenance?: { cachedFromJudgmentId: string },
   ): void {
     const ids = this.ids();
     this.journal.append({
@@ -788,6 +857,7 @@ export class ReflexEngine {
       questions,
       result,
       ...(reason !== undefined ? { reason } : {}),
+      ...(cacheProvenance !== undefined ? { cacheHit: true, cachedFromJudgmentId: cacheProvenance.cachedFromJudgmentId } : {}),
     });
   }
 

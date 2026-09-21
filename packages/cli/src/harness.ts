@@ -3,6 +3,7 @@ import type { Message, Model, Api } from "@earendil-works/pi-ai";
 import { dirname, join } from "node:path";
 import {
   ReflexEngine,
+  BoundedAnswerCache,
   contentHash,
   countLines,
   splitIntoSections,
@@ -12,6 +13,7 @@ import {
   openJournal,
   policyForTrust,
   staticVerdict,
+  type AnswerCache,
   type ApprovalHandler,
   type ApprovalRequest,
   type ApprovalResolution,
@@ -52,6 +54,7 @@ export interface HarnessOptions {
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   approvalHandler?: ApprovalHandler;
   registry?: CapabilityRegistry;
+  answerCache?: AnswerCache;
   skillRoots?: string[];
   focusMode?: FocusRolloutMode;
   pulseEveryTurns?: number;
@@ -149,6 +152,7 @@ export function createHarness(options: HarnessOptions): Harness {
     }),
     budgets: policy.budgets,
     signal: options.signal,
+    cache: options.answerCache ?? new BoundedAnswerCache(),
   });
 
   const taskText = () => recorder.currentTask?.objective ?? "unspecified";
