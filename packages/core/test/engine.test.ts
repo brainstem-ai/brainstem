@@ -7,6 +7,9 @@ import { mockSystemOne, choiceAnswer, noulAnswer, scoreAnswer } from "../src/pro
 import { loadJournal, openJournal } from "../src/journal";
 import { policyForTrust } from "../src/policy";
 import type { Answer, Question } from "../src/types";
+import { compileCatalog, type CapabilityDescriptor } from "../src/capabilities";
+import { createBitmap, fromIds } from "../src/bitmap";
+import { encodeSelectId, SELECT_BATCH_CHAR_BUDGET } from "../src/selection";
 
 const POLICY = policyForTrust(0.3);
 
@@ -433,5 +436,115 @@ describe("ReflexEngine", () => {
     expect(state.facts.repeated_actions).toEqual([{ label: "npm test", count: 2 }]);
     expect(state.facts.repeated_failures).toEqual([{ fingerprint: "fp1", count: 2 }]);
     expect(state.facts.approach_changed).toBe(true);
+  });
+});
+
+function capabilityDescriptor(id: string, extra: Partial<CapabilityDescriptor> = {}): CapabilityDescriptor {
+  return {
+    id,
+    kind: "tool",
+    version: "1.0.0",
+    description: `description for ${id}`,
+    useWhen: [`use ${id}`],
+    avoidWhen: [`avoid ${id}`],
+    requires: [],
+    alwaysAvailable: true,
+    contentHash: "0",
+    ...extra,
+  };
+}
+
+function selectEngineWith(script: (state: unknown, questions: Record<string, Question>) => Record<string, Answer>) {
+  const mock = mockSystemOne(script);
+  dir = mkdtempSync(join(tmpdir(), "brainstem-select-"));
+  const journalPath = join(dir, "session.ndjson");
+  const journal = openJournal(journalPath);
+  const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir });
+  return { mock, journalPath, engine };
+}
+
+function selectCatalog(...ids: string[]) {
+  return compileCatalog(ids.map((id) => capabilityDescriptor(id)));
+}
+
+describe("ReflexEngine.select", () => {
+  test("selects a capable tool and journals one reflex + decision per batch", async () => {
+    const catalog = selectCatalog("tool:a", "tool:b");
+    const { engine, journalPath, mock } = selectEngineWith((_state, questions) => {
+      const answers: Record<string, Answer> = {};
+      for (const id of Object.keys(questions)) {
+        answers[id] = noulAnswer(0.8);
+      }
+      return answers;
+    });
+
+    const available = fromIds(["tool:a", "tool:b"], catalog.entries, catalog.catalogHash);
+    const baseline = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const explicit = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const current = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const decision = await engine.select({
+      task: "do something",
+      recent: [],
+      catalog,
+      available,
+      baseline,
+      explicit,
+      current,
+    });
+
+    expect(decision.status).toBe("ok");
+    expect(decision.batches).toBe(1);
+    expect(mock.calls).toHaveLength(1);
+    const events = loadJournal(journalPath);
+    const reflexes = events.filter((e) => e.t === "reflex" && e.reflex === "select");
+    const decisions = events.filter((e) => e.t === "decision" && e.reflex === "select");
+    expect(reflexes).toHaveLength(1);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.t === "decision" && decisions[0].judgmentId).toBe(reflexes[0]?.t === "reflex" ? reflexes[0].judgmentId : undefined);
+  });
+
+  test("zero eligible candidates makes no SystemOne call and journals no reflex", async () => {
+    const catalog = selectCatalog("tool:a");
+    const { engine, mock } = selectEngineWith(() => ({}));
+    const available = fromIds(["tool:a"], catalog.entries, catalog.catalogHash);
+    const baseline = fromIds(["tool:a"], catalog.entries, catalog.catalogHash);
+    const explicit = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const current = createBitmap(catalog.catalogHash, catalog.entries.length);
+
+    const decision = await engine.select({ task: "t", recent: [], catalog, available, baseline, explicit, current });
+    expect(decision.status).toBe("ok");
+    expect(decision.batches).toBe(0);
+    expect(mock.calls).toHaveLength(0);
+  });
+
+  test("partial failure keeps batch 1 answers and reports partial", async () => {
+    const catalog = compileCatalog([
+      capabilityDescriptor("tool:a", { description: "a".repeat(4_000) }),
+      capabilityDescriptor("tool:b", { description: "b".repeat(4_000) }),
+    ]);
+    let call = 0;
+    const { engine, journalPath, mock } = selectEngineWith((_state, questions) => {
+      call++;
+      if (call === 1) {
+        return { [encodeSelectId("tool:a")]: noulAnswer(0.8) };
+      }
+      throw new Error("batch 2 unavailable");
+    });
+
+    const available = fromIds(["tool:a", "tool:b"], catalog.entries, catalog.catalogHash);
+    const baseline = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const explicit = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const current = createBitmap(catalog.catalogHash, catalog.entries.length);
+
+    const decision = await engine.select({ task: "t", recent: [], catalog, available, baseline, explicit, current });
+    expect(decision.status).toBe("partial");
+    expect(decision.batches).toBe(2);
+    expect(decision.scores["tool:a"]).toBe(0.8);
+    expect(decision.reasons["tool:a"]).toEqual({ kind: "added", score: 0.8 });
+    expect(decision.reasons["tool:b"]).toEqual({ kind: "unevaluated" });
+    expect(mock.calls).toHaveLength(2);
+
+    const events = loadJournal(journalPath);
+    expect(events.filter((e) => e.t === "reflex" && e.reflex === "select")).toHaveLength(2);
   });
 });

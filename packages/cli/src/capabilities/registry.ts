@@ -4,6 +4,7 @@ import {
   createBitmap,
   fromIds,
   hashAction,
+  type CapabilityBitmap,
   type CapabilityCatalog,
   type CapabilityDescriptor,
   type ComputeActiveOpts,
@@ -32,6 +33,16 @@ export const BASELINE_TOOL_IDS = [
   "tool:read_output",
   "tool:search_output",
 ] as const;
+
+function validateSelectedMask(catalog: CapabilityCatalog, bm: CapabilityBitmap, name: string): CapabilityBitmap {
+  if (bm.catalogHash !== catalog.catalogHash) {
+    throw new Error(`${name}: catalogHash mismatch with registry snapshot`);
+  }
+  if (bm.bitLength !== catalog.entries.length) {
+    throw new Error(`${name}: bitLength ${bm.bitLength} does not match catalog size ${catalog.entries.length}`);
+  }
+  return bm;
+}
 
 const BASELINE_TOOLS: RegisterInput[] = [
   {
@@ -167,7 +178,10 @@ export class CapabilityRegistry {
     return [...this.snapshot().entries];
   }
 
-  workingSet(opts: ComputeActiveOpts = {}): WorkingSet {
+  workingSet(
+    opts: ComputeActiveOpts = {},
+    selected?: { evaluated: CapabilityBitmap; recommended: CapabilityBitmap },
+  ): WorkingSet {
     const catalog = this.snapshot();
     const availableIds = catalog.entries
       .filter((d) => d.alwaysAvailable || this.#configuredAvailability.get(d.id) !== false)
@@ -179,8 +193,12 @@ export class CapabilityRegistry {
       catalog.catalogHash,
     );
     const explicit = fromIds(this.#explicit, catalog.entries, catalog.catalogHash);
-    const evaluated = createBitmap(catalog.catalogHash, catalog.entries.length);
-    const recommended = createBitmap(catalog.catalogHash, catalog.entries.length);
+    const evaluated = selected
+      ? validateSelectedMask(catalog, selected.evaluated, "evaluated")
+      : createBitmap(catalog.catalogHash, catalog.entries.length);
+    const recommended = selected
+      ? validateSelectedMask(catalog, selected.recommended, "recommended")
+      : createBitmap(catalog.catalogHash, catalog.entries.length);
     const masks = { available, baseline, explicit, evaluated, recommended };
     const active = computeActive(catalog, masks, opts).active;
     return { ...masks, active };
