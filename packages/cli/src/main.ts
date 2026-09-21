@@ -64,19 +64,39 @@ function parseArgs(argv: string[]): Args {
 function runReplay(argv: string[]): void {
   const journalPath = argv[0] ? expandHome(argv[0]) : undefined;
   if (!journalPath) {
-    console.error("usage: brainstem replay <journal.ndjson> [--trust 0..1]");
+    console.error("usage: brainstem replay <journal.ndjson> [--trust 0..1] [--mode policy|reevaluate]");
     process.exit(1);
   }
   let trust = DEFAULT_TRUST;
+  let mode: "policy" | "reevaluate" = "policy";
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === "--trust") trust = Number(argv[i + 1]);
+    else if (argv[i] === "--mode") mode = (argv[i + 1] as "policy" | "reevaluate") ?? mode;
   }
+  if (mode === "reevaluate") {
+    console.error(
+      "live re-evaluation is not implemented — replay only recomputes deterministic decisions from recorded scores. Re-run the task to get a fresh judgment.",
+    );
+    process.exit(1);
+  }
+  if (mode !== "policy") {
+    console.error(`--mode must be policy or reevaluate, got ${mode}`);
+    process.exit(1);
+  }
+
   const events = loadJournal(journalPath);
   const report = replayJournal(events, policyForTrust(trust));
   console.log(`replay: ${events.length} events, trust ${trust}`);
-  console.log(`decisions re-scored: ${report.total}  unchanged: ${report.unchanged}  changed: ${report.changed.length}`);
+  console.log(`decisions replayed: ${report.total}  unchanged: ${report.unchanged}  changed: ${report.changed.length}`);
   for (const c of report.changed) {
     console.log(`  ${c.reflex} [${c.subject}] ${c.was} -> ${c.now}: ${c.reasons.join("; ")}`);
+  }
+  console.log(`static-only (no judgment, floor decided): ${report.staticOnly}`);
+  if (report.unsupported > 0) {
+    console.log(`unsupported: ${report.unsupported}`);
+    for (const [reason, count] of Object.entries(report.unsupportedReasons)) {
+      console.log(`  ${reason}: ${count}`);
+    }
   }
 }
 
@@ -107,7 +127,7 @@ async function main() {
 Usage:
   brainstem [--trust 0..1] [--model provider/id] [--mini-model provider/id]
             [--journal path] [--task "..."] [--cwd path] [--skill-root path]
-  brainstem replay <journal.ndjson> [--trust 0..1]
+  brainstem replay <journal.ndjson> [--trust 0..1] [--mode policy|reevaluate]
 
   --trust N        confidence bar for auto-running (0 = most cautious, 1 = most autonomous; default 0.3). Safety thresholds never change.
   --mini-model id  smaller model for steer routing (default zai/glm-5.3-flash)
@@ -115,7 +135,8 @@ Usage:
   --journal p      NDJSON journal path (reflex answers, decisions, tool calls)
   --skill-root p   directory containing skill subdirectories (repeatable)
   --focus-mode m   off (default), shadow (compute + journal, never presented), or on (presented)
-  replay           re-score a recorded journal against a new trust level (no API calls)`);
+  replay           re-score a recorded journal's decisions against a new trust level (no API calls)
+                   --mode policy (default) replays deterministically; --mode reevaluate is not implemented`);
     return;
   }
 

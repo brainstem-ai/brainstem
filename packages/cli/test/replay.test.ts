@@ -125,4 +125,83 @@ describe("replayJournal", () => {
     expect(report.changed).toHaveLength(1);
     expect(report.changed[0]?.now).toBe("ask");
   });
+
+  test("a static-floor decision never reuses an unrelated earlier judgment's answers", () => {
+    // A successful, high-confidence gate judgment for one command, immediately
+    // followed by a static-floor deny for a DIFFERENT, unrelated command with
+    // no judgmentId at all. Before the fix, the static decision's missing
+    // judgmentId fell back to "the most recently seen gate reflex" — this
+    // one — and got silently re-scored as if it had actually been judged.
+    const events: JournalEvent[] = [
+      gateReflex("j_1", HIGH_CONF_AUTO),
+      { t: "decision", v: 2, judgmentId: "j_1", ts: 2, reflex: "gate", action: "auto", reasons: ["original"] },
+      {
+        t: "decision",
+        v: 2,
+        ts: 3,
+        reflex: "gate",
+        action: "deny",
+        reasons: ["static floor: dangerous pattern"],
+        staticVerdict: "deny",
+      },
+    ];
+    const report = replayJournal(events, policyForTrust(0.3));
+    expect(report.total).toBe(1);
+    expect(report.staticOnly).toBe(1);
+    expect(report.changed).toHaveLength(0);
+
+    // Even under a policy that would flip the FIRST decision, the static one
+    // must never appear in `changed` — it was never a judgment to begin with.
+    const stricter = replayJournal(events, policyForTrust(0.05));
+    expect(stricter.staticOnly).toBe(1);
+    expect(stricter.changed.every((c) => c.was !== "deny")).toBe(true);
+  });
+
+  test("select and focus decisions are counted as unsupported, not silently dropped", () => {
+    const events: JournalEvent[] = [
+      {
+        t: "reflex",
+        v: 2,
+        sessionId: "sess_r",
+        judgmentId: "j_sel",
+        ts: 1,
+        reflex: "select",
+        subject: "fix the auth test",
+        status: "completed",
+        state: {},
+        questions: {},
+        result: { model: "jev-1.13.0", latencyMs: 100, usage: { inputTokens: 300, outputTokens: 0 }, answers: {} as never },
+      },
+      { t: "decision", v: 2, judgmentId: "j_sel", ts: 2, reflex: "select", action: "ok", reasons: ["1", "2", "abcd1234"] },
+      {
+        t: "reflex",
+        v: 2,
+        sessionId: "sess_r",
+        judgmentId: "j_foc",
+        ts: 3,
+        reflex: "focus",
+        subject: "bash: npm test",
+        status: "completed",
+        state: {},
+        questions: {},
+        result: { model: "jev-1.13.0", latencyMs: 100, usage: { inputTokens: 300, outputTokens: 0 }, answers: {} as never },
+      },
+      { t: "decision", v: 2, judgmentId: "j_foc", ts: 4, reflex: "focus", action: "select", reasons: ["1", "1", "efgh5678"] },
+    ];
+    const report = replayJournal(events, policyForTrust(0.3));
+    expect(report.total).toBe(0);
+    expect(report.unsupported).toBe(2);
+    expect(report.unsupportedReasons["select: catalog not recorded"]).toBe(1);
+    expect(report.unsupportedReasons["focus: manifest not recorded"]).toBe(1);
+  });
+
+  test("a decision whose judgmentId resolves to no reflex event is unsupported, not a crash", () => {
+    const events: JournalEvent[] = [
+      { t: "decision", v: 2, judgmentId: "j_missing", ts: 1, reflex: "gate", action: "auto", reasons: [] },
+    ];
+    const report = replayJournal(events, policyForTrust(0.3));
+    expect(report.total).toBe(0);
+    expect(report.unsupported).toBe(1);
+    expect(report.unsupportedReasons["missing reflex"]).toBe(1);
+  });
 });

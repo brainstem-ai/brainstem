@@ -94,10 +94,12 @@ selection ever shapes what the model sees:
 ## Replay
 
 ```sh
-bun packages/cli/src/main.ts replay <journal.ndjson> [--trust N]
+bun packages/cli/src/main.ts replay <journal.ndjson> [--trust N] [--mode policy|reevaluate]
 ```
 
-Re-scores recorded judgments offline. Limitations: static-floor denials have no recorded judgment; side effects are never replayed.
+Re-scores recorded judgments offline against a different policy, resolved strictly by `judgmentId` — never by "the most recently seen judgment of this type," which could silently misattribute an unrelated earlier judgment's answers to a decision that was never actually sent to Jev. The report distinguishes three outcomes: `replayed` (a resolved judgment, re-decided — this is what `unchanged`/`changed` count), `static-only` (no judgment at all — a floor verdict, never replayable), and `unsupported` (a `select`/`focus` decision, whose bitmap outcome can't be reconstructed without the full catalog or section manifest recorded alongside it — not yet journaled; visible in the report rather than silently dropped).
+
+`--mode reevaluate` (new live judgment calls, not offline reuse of recorded scores) is recognized but not implemented — it exits with an explicit error rather than silently no-op'ing. `--mode policy` (default) never makes an API call. Side effects and human approvals are never replayed; approval remains a recorded historical outcome that a changed policy cannot manufacture.
 
 ## Versions
 
