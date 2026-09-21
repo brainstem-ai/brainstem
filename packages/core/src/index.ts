@@ -13,6 +13,42 @@ export { openJournal, appendJournalEvent, loadJournal, JOURNAL_SCHEMA_VERSION } 
 export type { Journal, JournalEvent, TurnSpans, ReflexStatus, ApprovalStatus } from "./journal";
 export { hashAction, canonicalJson, newId } from "./evidence";
 export type { TaskState, ToolObservation, ToolStatus } from "./evidence";
+export {
+  createBitmap,
+  cloneBitmap,
+  setBit,
+  clearBit,
+  getBit,
+  popcount,
+  isEmpty,
+  isFull,
+  union,
+  intersection,
+  difference,
+  equality,
+  toIds,
+  fromIds,
+  encodeBitmap,
+  decodeBitmap,
+} from "./bitmap";
+export type { CapabilityBitmap, EncodedBitmap } from "./bitmap";
+export {
+  compileCatalog,
+  computeActive,
+  workingSetFromIds,
+  activeIds,
+  cloneWorkingSet,
+  CAPCAT_NAMESPACE,
+  SECT_NAMESPACE,
+} from "./capabilities";
+export type {
+  CapabilityDescriptor,
+  CapabilityCatalog,
+  WorkingSet,
+  ComputeActiveOpts,
+  ComputeActiveResult,
+  SeedSource,
+} from "./capabilities";
 export { gateQuestions, sanitizeQuestions, pulseQuestions, steerQuestions, verifyQuestions, GATE_DISPOSITION_CRITERIA, SANITIZE_SEVERITY_LEVELS, CONTINUING_LEVELS } from "./questions";
 export { policyForTrust, DEFAULT_TRUST } from "./policy";
 export type { Policy } from "./policy";
