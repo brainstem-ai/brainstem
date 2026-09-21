@@ -159,7 +159,7 @@ describe("decideSanitize (pure)", () => {
 });
 
 describe("ReflexEngine", () => {
-  test("gates a safe command to auto and journals reflex + decision", async () => {
+  test("gates a safe command to auto and journals reflex + decision linked by judgmentId", async () => {
     const { engine, journalPath, mock } = engineWith(gateScript({}));
     const decision = await engine.gate({ tool: "bash", command: "npm test", task: "fix the auth test" });
 
@@ -167,10 +167,15 @@ describe("ReflexEngine", () => {
     expect(mock.calls).toHaveLength(1);
     const events = loadJournal(journalPath);
     expect(events.map((e) => e.t)).toEqual(["reflex", "decision"]);
-    expect(events[1]?.t === "decision" && events[1].action).toBe("auto");
+    const reflex = events[0];
+    const recorded = events[1];
+    expect(reflex?.t === "reflex" && reflex.v).toBe(2);
+    expect(reflex?.t === "reflex" && reflex.status).toBe("completed");
+    expect(recorded?.t === "decision" && recorded.v).toBe(2);
+    expect(recorded?.t === "decision" && recorded.judgmentId).toBe(reflex?.t === "reflex" ? reflex.judgmentId : undefined);
   });
 
-  test("static floor denies without any Jev call", async () => {
+  test("static floor denies without any Jev call and records no judgmentId", async () => {
     const { engine, journalPath, mock } = engineWith(gateScript({}));
     const decision = await engine.gate({ tool: "bash", command: "rm -rf /", task: "fix the auth test" });
 
@@ -179,6 +184,9 @@ describe("ReflexEngine", () => {
     expect(mock.calls).toHaveLength(0);
     const events = loadJournal(journalPath);
     expect(events.map((e) => e.t)).toEqual(["decision"]);
+    const recorded = events[0];
+    expect(recorded?.t === "decision" && recorded.judgmentId).toBeUndefined();
+    expect(recorded?.t === "decision" && recorded.staticVerdict).toBe("deny");
   });
 
   test("write to a secrets path is denied by floor without Jev", async () => {
@@ -189,14 +197,22 @@ describe("ReflexEngine", () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  test("static floor ask escalates a Jev auto verdict", async () => {
-    const { engine } = engineWith(gateScript({}));
+  test("static floor ask escalates a Jev auto verdict and links the decision to its reflex", async () => {
+    const { engine, journalPath } = engineWith(gateScript({}));
     const decision = await engine.gate({ tool: "bash", command: "npm publish", task: "fix the auth test" });
     expect(decision.action).toBe("ask");
     expect(decision.reasons.some((r) => r.includes("static floor"))).toBe(true);
+
+    const events = loadJournal(journalPath);
+    const reflex = events[0];
+    const recorded = events[1];
+    expect(
+      reflex?.t === "reflex" && recorded?.t === "decision" ? recorded.judgmentId : undefined,
+    ).toBe(reflex?.t === "reflex" ? reflex.judgmentId : undefined);
+    expect(recorded?.t === "decision" && recorded.staticVerdict).toBe("ask");
   });
 
-  test("sanitize blocks injected tool output", async () => {
+  test("sanitize block journals reflex and both decisions referencing the same judgmentId", async () => {
     const { engine, journalPath } = engineWith(sanitizeScript({
       contains_agent_directive: noulAnswer(0.98),
       tries_to_override: noulAnswer(0.99),
@@ -207,6 +223,56 @@ describe("ReflexEngine", () => {
 
     expect(result.action).toBe("block");
     const events = loadJournal(journalPath);
-    expect(events[0]?.t === "reflex" && events[0].reflex).toBe("sanitize");
+    const reflex = events[0];
+    expect(reflex?.t === "reflex" && reflex.reflex).toBe("sanitize");
+    expect(reflex?.t === "reflex" && reflex.status).toBe("completed");
+    const decisions = events.filter((e) => e.t === "decision");
+    expect(decisions).toHaveLength(2);
+    expect(decisions.every((d) => d.t === "decision" && d.judgmentId === (reflex?.t === "reflex" ? reflex.judgmentId : undefined))).toBe(true);
+  });
+
+  test("attribution: interleaved gates keep judgmentId pairs intact", async () => {
+    const resolvers: ((result: import("../src/types").AskResult) => void)[] = [];
+    const deferredSystemOne = {
+      name: "deferred",
+      ask: () => new Promise<import("../src/types").AskResult>((resolve) => resolvers.push(resolve)),
+    };
+    dir = mkdtempSync(join(tmpdir(), "brainstem-engine-"));
+    const journalPath = join(dir, "session.ndjson");
+    const journal = openJournal(journalPath);
+    const engine = new ReflexEngine({ systemOne: deferredSystemOne, journal, policy: POLICY, root: dir });
+
+    const pendingA = engine.gate({ tool: "bash", command: "npm test", task: "task A" });
+    const pendingB = engine.gate({ tool: "bash", command: "npm run lint", task: "task B" });
+
+    const answers = gateScript({})();
+    resolvers[1]!({
+      model: "mock",
+      latencyMs: 0,
+      usage: { inputTokens: 0, outputTokens: 0 },
+      answers,
+    });
+    resolvers[0]!({
+      model: "mock",
+      latencyMs: 0,
+      usage: { inputTokens: 0, outputTokens: 0 },
+      answers,
+    });
+    const [a, b] = await Promise.all([pendingA, pendingB]);
+    expect(a.action).toBe("auto");
+    expect(b.action).toBe("auto");
+
+    const events = loadJournal(journalPath);
+    const reflexes = events.filter((e) => e.t === "reflex");
+    const decisions = events.filter((e) => e.t === "decision");
+    expect(reflexes).toHaveLength(2);
+    expect(decisions).toHaveLength(2);
+    expect(new Set(reflexes.map((r) => (r.t === "reflex" ? r.judgmentId : ""))).size).toBe(2);
+    for (const d of decisions) {
+      expect(d.t === "decision" && d.judgmentId !== undefined).toBe(true);
+      expect(
+        d.t === "decision" && reflexes.some((r) => r.t === "reflex" && r.judgmentId === d.judgmentId),
+      ).toBe(true);
+    }
   });
 });

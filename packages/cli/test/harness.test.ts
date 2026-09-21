@@ -114,13 +114,27 @@ describe("harness integration", () => {
     const gateDeny = decisions.find((e) => e.reflex === "gate" && e.action === "deny");
     expect(gateDeny).toBeDefined();
     expect(gateDeny.reasons).toContain("static floor: dangerous pattern");
+    expect(gateDeny.judgmentId).toBeUndefined();
+    expect(gateDeny.staticVerdict).toBe("deny");
 
     const sanitizeBlock = decisions.find((e) => e.reflex === "sanitize" && e.action === "block");
     expect(sanitizeBlock).toBeDefined();
 
-    expect(journal.some((e) => e.t === "tool_call" && e.tool === "bash")).toBe(true);
-    expect(journal.some((e) => e.t === "tool_result" && e.tool === "read" && e.ok)).toBe(true);
-    expect(journal.some((e) => e.t === "session_start" && e.trust === 0.3)).toBe(true);
+    const bashObservation = journal.find((e) => e.t === "tool_observation" && e.observation.tool === "bash");
+    expect(bashObservation?.observation.status).toBe("blocked");
+    expect(bashObservation?.toolCallId).toBe("tc1");
+
+    const readObservation = journal.find((e) => e.t === "tool_observation" && e.observation.tool === "read");
+    expect(readObservation?.observation.status).toBe("ok");
+    expect(readObservation?.observation.toolCallId).toBe("tc2");
+    expect(readObservation?.deliveredExcerpt).toContain("[brainstem] blocked");
+    expect(readObservation?.deliveredExcerpt).not.toContain("evil.example");
+
+    const sessionStart = journal.find((e) => e.t === "session_start");
+    expect(sessionStart?.v).toBe(2);
+    expect(sessionStart?.trust).toBe(0.3);
+    expect(typeof sessionStart?.sessionId).toBe("string");
+    expect(typeof sessionStart?.policyHash).toBe("string");
 
     const transcript = agent.state.messages;
     const bashResult = transcript.find(
@@ -159,7 +173,7 @@ describe("harness integration", () => {
       };
     });
 
-    const { agent } = createHarness({
+    const harness = createHarness({
       systemOne: mock,
       streamFn: scriptedStream([
         assistantMessage(
@@ -174,14 +188,29 @@ describe("harness integration", () => {
       cwd: dir,
     });
 
-    await agent.prompt("Say hello");
+    await harness.prompt("Say hello");
 
     const journal = readFileSync(journalPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
     const gateAuto = journal.find((e) => e.t === "decision" && e.reflex === "gate" && e.action === "auto");
     expect(gateAuto).toBeDefined();
     const verifyOk = journal.find((e) => e.t === "decision" && e.reflex === "verify" && e.action === "ok");
     expect(verifyOk).toBeDefined();
-    expect(journal.some((e) => e.t === "tool_result" && e.tool === "bash" && e.summary.includes("hello-brainstem"))).toBe(true);
+
+    const gateReflex = journal.find((e) => e.t === "reflex" && e.reflex === "gate");
+    expect(gateAuto?.judgmentId).toBe(gateReflex?.judgmentId);
+    expect(gateReflex?.status).toBe("completed");
+
+    const bashObservation = journal.find((e) => e.t === "tool_observation" && e.observation.tool === "bash");
+    expect(bashObservation?.observation.status).toBe("ok");
+    expect(bashObservation?.observation.exitCode).toBe(0);
+    expect(bashObservation?.deliveredExcerpt).toContain("hello-brainstem");
+
+    expect(journal.some((e) => e.t === "task_start" && e.objective === "Say hello")).toBe(true);
+    expect(journal.some((e) => e.t === "turn_start")).toBe(true);
+    expect(journal.some((e) => e.t === "turn_end" && e.modelCalls > 0)).toBe(true);
+    const llmCalls = journal.filter((e) => e.t === "llm_call");
+    expect(llmCalls.length).toBeGreaterThan(0);
+    expect(llmCalls.every((e) => e.usage.costTotal === "unknown")).toBe(true);
   });
 
   test("steers to the mini model when Jev is confident", async () => {

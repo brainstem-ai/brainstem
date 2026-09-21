@@ -1,5 +1,6 @@
-import { staticVerdict } from "./floor";
-import type { Journal } from "./journal";
+import { newId } from "./evidence";
+import { staticVerdict, type StaticVerdict } from "./floor";
+import type { Journal, ReflexStatus } from "./journal";
 import { policyForTrust, type Policy } from "./policy";
 import { gateQuestions, pulseQuestions, sanitizeQuestions, steerQuestions, verifyQuestions } from "./questions";
 import type { Answer, AskResult, Question, SystemOne } from "./types";
@@ -176,12 +177,20 @@ export function decideSteer(answers: Record<string, Answer>, policy: Policy): St
   return { tier: "frontier", reasons: [`mini chosen but confidence ${tier.confidence.toFixed(2)} below bar`] };
 }
 
+export interface ReflexIds {
+  sessionId: string;
+  taskId?: string;
+  turnId?: string;
+}
+
 export interface ReflexEngineDeps {
   systemOne: SystemOne;
   journal: Journal;
   policy?: Policy;
   environment?: string;
   root: string;
+  makeId?: () => string;
+  ids?: () => ReflexIds;
 }
 
 export class ReflexEngine {
@@ -190,6 +199,8 @@ export class ReflexEngine {
   readonly policy: Policy;
   private readonly environment: string;
   private readonly root: string;
+  private readonly makeId: () => string;
+  private readonly ids: () => ReflexIds;
 
   constructor(deps: ReflexEngineDeps) {
     this.systemOne = deps.systemOne;
@@ -197,6 +208,8 @@ export class ReflexEngine {
     this.policy = deps.policy ?? policyForTrust(0.3);
     this.environment = deps.environment ?? "A git repository in the current working directory.";
     this.root = deps.root;
+    this.makeId = deps.makeId ?? (() => newId("j"));
+    this.ids = deps.ids ?? (() => ({ sessionId: "" }));
   }
 
   async gate(input: GateInput): Promise<GateDecision & { result?: AskResult }> {
@@ -204,10 +217,11 @@ export class ReflexEngine {
 
     if (floor === "deny") {
       const decision: GateDecision = { action: "deny", reasons: ["static floor: dangerous pattern"] };
-      this.recordDecision("gate", decision, input.command);
+      this.recordDecision("gate", decision, input.command, { staticVerdict: "deny" });
       return decision;
     }
 
+    const judgmentId = this.makeId();
     const state = {
       task: input.task,
       environment: this.environment,
@@ -215,13 +229,13 @@ export class ReflexEngine {
     };
     const questions = gateQuestions(input.command, input.task);
     const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("gate", input.command, state, questions, result);
+    this.recordReflex("gate", input.command, state, questions, result, judgmentId);
 
     let decision = decideGate(result.answers, this.policy);
     if (floor === "ask" && decision.action === "auto") {
       decision = { action: "ask", reasons: ["static floor: risky pattern", ...decision.reasons] };
     }
-    this.recordDecision("gate", decision, input.command);
+    this.recordDecision("gate", decision, input.command, { judgmentId, staticVerdict: floor });
     return { ...decision, result };
   }
 
@@ -235,6 +249,7 @@ export class ReflexEngine {
     source: string,
     intent: string,
   ): Promise<{ sanitize: SanitizeDecision; verify: VerifyDecision; result: AskResult }> {
+    const judgmentId = this.makeId();
     const state = {
       situation:
         "A coding agent is working in a repository and just read this content as the output of a tool (a file, command output, or web page).",
@@ -243,16 +258,17 @@ export class ReflexEngine {
     };
     const questions = { ...sanitizeQuestions(), ...verifyQuestions() };
     const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("sanitize", source, state, questions, result);
+    this.recordReflex("sanitize", source, state, questions, result, judgmentId);
 
     const sanitize = decideSanitize(result.answers, this.policy);
     const verify = decideVerify(result.answers, this.policy);
-    this.recordDecision("sanitize", sanitize, source);
-    this.recordDecision("verify", verify, source);
+    this.recordDecision("sanitize", sanitize, source, { judgmentId });
+    this.recordDecision("verify", verify, source, { judgmentId });
     return { sanitize, verify, result };
   }
 
   async pulse(input: { task: string; events: string[]; budget: string }): Promise<PulseDecision & { result: AskResult }> {
+    const judgmentId = this.makeId();
     const state = {
       task: input.task,
       recent_events: input.events,
@@ -260,24 +276,25 @@ export class ReflexEngine {
     };
     const questions = pulseQuestions();
     const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("pulse", input.task, state, questions, result);
+    this.recordReflex("pulse", input.task, state, questions, result, judgmentId);
 
     const decision = decidePulse(result.answers, this.policy);
-    this.recordDecision("pulse", decision, input.task);
+    this.recordDecision("pulse", decision, input.task, { judgmentId });
     return { ...decision, result };
   }
 
   async steer(input: { task: string; events: string[] }): Promise<SteerDecision & { result: AskResult }> {
+    const judgmentId = this.makeId();
     const state = {
       task: input.task,
       recent_events: input.events,
     };
     const questions = steerQuestions();
     const result = await this.systemOne.ask(state, questions);
-    this.recordReflex("steer", input.task, state, questions, result);
+    this.recordReflex("steer", input.task, state, questions, result, judgmentId);
 
     const decision = decideSteer(result.answers, this.policy);
-    this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task);
+    this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task, { judgmentId });
     return { ...decision, result };
   }
 
@@ -287,25 +304,44 @@ export class ReflexEngine {
     state: unknown,
     questions: Record<string, import("./types").Question>,
     result: AskResult,
+    judgmentId: string,
+    status: ReflexStatus = "completed",
+    reason?: string,
   ): void {
+    const ids = this.ids();
     this.journal.append({
       t: "reflex",
+      v: 2,
+      sessionId: ids.sessionId,
+      ...(ids.taskId !== undefined ? { taskId: ids.taskId } : {}),
+      ...(ids.turnId !== undefined ? { turnId: ids.turnId } : {}),
+      judgmentId,
       ts: Date.now(),
       reflex,
       subject,
+      status,
       state,
       questions,
       result,
+      ...(reason !== undefined ? { reason } : {}),
     });
   }
 
-  private recordDecision(reflex: string, decision: { action: string; reasons: string[] }, subject: string): void {
+  private recordDecision(
+    reflex: string,
+    decision: { action: string; reasons: string[] },
+    subject: string,
+    opts?: { judgmentId?: string; staticVerdict?: StaticVerdict },
+  ): void {
     this.journal.append({
       t: "decision",
+      v: 2,
+      ...(opts?.judgmentId !== undefined ? { judgmentId: opts.judgmentId } : {}),
       ts: Date.now(),
       reflex,
       action: decision.action,
       reasons: decision.reasons,
+      ...(opts?.staticVerdict !== undefined ? { staticVerdict: opts.staticVerdict } : {}),
     });
   }
 }

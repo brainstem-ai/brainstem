@@ -3,12 +3,16 @@ import { replayJournal } from "../src/replay";
 import { policyForTrust } from "@brainstem/core";
 import type { JournalEvent } from "@brainstem/core";
 
-function gateReflex(answers: Record<string, unknown>): JournalEvent {
+function gateReflex(judgmentId: string, answers: Record<string, unknown>): JournalEvent {
   return {
     t: "reflex",
+    v: 2,
+    sessionId: "sess_r",
+    judgmentId,
     ts: 1,
     reflex: "gate",
     subject: "npm publish",
+    status: "completed",
     state: {},
     questions: {},
     result: { model: "jev-1.13.0", latencyMs: 200, usage: { inputTokens: 700, outputTokens: 0 }, answers: answers as never },
@@ -32,9 +36,9 @@ const MID_CONF_AUTO = {
 describe("replayJournal", () => {
   test("reports unchanged decisions when policy matches", () => {
     const events: JournalEvent[] = [
-      { t: "session_start", ts: 0, trust: 0.3 },
-      gateReflex(HIGH_CONF_AUTO),
-      { t: "decision", ts: 2, reflex: "gate", action: "auto", reasons: ["original"] },
+      { t: "session_start", v: 2, sessionId: "sess_r", ts: 0, trust: 0.3, policySnapshot: policyForTrust(0.3), policyHash: "h" },
+      gateReflex("j_1", HIGH_CONF_AUTO),
+      { t: "decision", v: 2, judgmentId: "j_1", ts: 2, reflex: "gate", action: "auto", reasons: ["original"] },
     ];
     const report = replayJournal(events, policyForTrust(0.3));
     expect(report.total).toBe(1);
@@ -44,9 +48,9 @@ describe("replayJournal", () => {
 
   test("flags decisions a stricter policy would flip", () => {
     const events: JournalEvent[] = [
-      { t: "session_start", ts: 0, trust: 0.3 },
-      gateReflex(MID_CONF_AUTO),
-      { t: "decision", ts: 2, reflex: "gate", action: "auto", reasons: ["original"] },
+      { t: "session_start", v: 2, sessionId: "sess_r", ts: 0, trust: 0.3, policySnapshot: policyForTrust(0.3), policyHash: "h" },
+      gateReflex("j_1", MID_CONF_AUTO),
+      { t: "decision", v: 2, judgmentId: "j_1", ts: 2, reflex: "gate", action: "auto", reasons: ["original"] },
     ];
     const report = replayJournal(events, policyForTrust(0.05));
     expect(report.changed).toHaveLength(1);
@@ -55,7 +59,7 @@ describe("replayJournal", () => {
     expect(report.changed[0]?.reasons.join(" ")).toContain("confidence");
   });
 
-  test("re-decides sanitize and verify reflexes", () => {
+  test("re-decides sanitize and verify reflexes against their shared judgment", () => {
     const answers = {
       contains_agent_directive: { type: "noul", noul: 0.1 },
       tries_to_override: { type: "noul", noul: 0.1 },
@@ -67,28 +71,58 @@ describe("replayJournal", () => {
     const events: JournalEvent[] = [
       {
         t: "reflex",
+        v: 2,
+        sessionId: "sess_r",
+        judgmentId: "j_2",
         ts: 1,
         reflex: "sanitize",
         subject: "tool:read",
+        status: "completed",
         state: {},
         questions: {},
         result: { model: "jev-1.13.0", latencyMs: 180, usage: { inputTokens: 500, outputTokens: 0 }, answers: answers as never },
       },
-      { t: "decision", ts: 2, reflex: "sanitize", action: "pass", reasons: [] },
-      { t: "decision", ts: 3, reflex: "verify", action: "ok", reasons: [] },
+      { t: "decision", v: 2, judgmentId: "j_2", ts: 2, reflex: "sanitize", action: "pass", reasons: [] },
+      { t: "decision", v: 2, judgmentId: "j_2", ts: 3, reflex: "verify", action: "ok", reasons: [] },
     ];
     const report = replayJournal(events, policyForTrust(0.3));
     expect(report.total).toBe(2);
     expect(report.unchanged).toBe(2);
   });
 
-  test("ignores non-reflex events and unmatched decisions", () => {
+  test("skips unavailable reflexes and static-only decisions without a judgment", () => {
     const events: JournalEvent[] = [
-      { t: "session_start", ts: 0, trust: 0.3 },
-      { t: "decision", ts: 1, reflex: "gate", action: "auto", reasons: [] },
-      { t: "session_end", ts: 2 },
+      { t: "session_start", v: 2, sessionId: "sess_r", ts: 0, trust: 0.3, policySnapshot: policyForTrust(0.3), policyHash: "h" },
+      {
+        t: "reflex",
+        v: 2,
+        sessionId: "sess_r",
+        judgmentId: "j_3",
+        ts: 1,
+        reflex: "gate",
+        subject: "npm test",
+        status: "unavailable",
+        state: {},
+        questions: {},
+        result: null,
+        reason: "jev unreachable",
+      },
+      { t: "decision", v: 2, ts: 2, reflex: "gate", action: "deny", reasons: ["static floor"], staticVerdict: "deny" },
+      { t: "session_end", v: 2, sessionId: "sess_r", ts: 3, reason: "normal" },
     ];
     const report = replayJournal(events, policyForTrust(0.3));
     expect(report.total).toBe(0);
+  });
+
+  test("matches a decision to the right reflex by judgmentId, not by recency", () => {
+    const events: JournalEvent[] = [
+      gateReflex("j_old", MID_CONF_AUTO),
+      gateReflex("j_new", HIGH_CONF_AUTO),
+      { t: "decision", v: 2, judgmentId: "j_old", ts: 5, reflex: "gate", action: "auto", reasons: ["original"] },
+    ];
+    const report = replayJournal(events, policyForTrust(0.05));
+    expect(report.total).toBe(1);
+    expect(report.changed).toHaveLength(1);
+    expect(report.changed[0]?.now).toBe("ask");
   });
 });

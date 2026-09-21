@@ -152,20 +152,26 @@ Usage:
     onDelta: (delta) => process.stdout.write(delta),
   });
 
-  if (args.task) {
-    await harness.prompt(args.task);
-    process.stdout.write("\n");
-    return;
-  }
+  try {
+    if (args.task) {
+      await harness.prompt(args.task);
+      process.stdout.write("\n");
+      return;
+    }
 
-  console.log("type a task, ctrl+d to exit");
-  const rl = createInterface({ input: process.stdin });
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) continue;
-    process.stdout.write("\n");
-    await harness.prompt(trimmed);
-    process.stdout.write("\n");
+    console.log("type a task, ctrl+d to exit");
+    const rl = createInterface({ input: process.stdin });
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      process.stdout.write("\n");
+      await harness.prompt(trimmed);
+      process.stdout.write("\n");
+    }
+    harness.endSession("normal");
+  } catch (err) {
+    harness.endSession("error", err instanceof Error ? err.message : String(err));
+    throw err;
   }
 }
 

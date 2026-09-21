@@ -36,21 +36,22 @@ const DECIDERS: Record<string, (answers: Record<string, Answer>, policy: Policy)
 
 export function replayJournal(events: JournalEvent[], policy: Policy): ReplayReport {
   const report: ReplayReport = { total: 0, unchanged: 0, changed: [] };
+  const answersByJudgment = new Map<string, Record<string, Answer>>();
   const lastAnswers = new Map<string, Record<string, Answer>>();
   const lastSubjects = new Map<string, string>();
-  let lastReflex = "";
 
   for (const event of events) {
     if (event.t === "reflex") {
+      if (!event.result) continue;
+      answersByJudgment.set(event.judgmentId, event.result.answers);
       lastAnswers.set(event.reflex, event.result.answers);
       lastSubjects.set(event.reflex, event.subject);
-      lastReflex = event.reflex;
       continue;
     }
     if (event.t !== "decision") continue;
 
     const decide = DECIDERS[event.reflex];
-    const answers = lastAnswers.get(event.reflex) ?? lastAnswers.get(lastReflex);
+    const answers = (event.judgmentId !== undefined ? answersByJudgment.get(event.judgmentId) : undefined) ?? lastAnswers.get(event.reflex);
     if (!decide || !answers) continue;
 
     report.total += 1;
