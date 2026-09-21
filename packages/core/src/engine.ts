@@ -1,5 +1,7 @@
 import { checkBudgets, type BudgetCheck, type BudgetLimits } from "./budgets";
+import { createBitmap, popcount, type CapabilityBitmap } from "./bitmap";
 import { hashAction, newId } from "./evidence";
+import type { CapabilityCatalog } from "./capabilities";
 import type { ToolStatus } from "./evidence";
 import { JevCancelledError, JevUnavailableError } from "./errors";
 import { staticVerdict, type StaticVerdict } from "./floor";
@@ -15,6 +17,18 @@ import {
 } from "./questions";
 import type { Answer, AskOptions, AskResult, JudgmentOutcome, Question, SystemOne } from "./types";
 import { validateAnswers, validateGroups } from "./validation";
+import {
+  batchCandidates,
+  buildEvaluatedBitmap,
+  buildFallbackDecision,
+  buildSelectQuestions,
+  decideSelect,
+  eligibleForSelection,
+  encodeSelectId,
+  type SelectDecision,
+  type SelectInput,
+  SELECT_BATCH_CHAR_BUDGET,
+} from "./selection";
 
 export type GateAction = "auto" | "ask" | "deny";
 
@@ -434,6 +448,15 @@ export class ReflexEngine {
     return { tier: "frontier", reasons: ["steer unavailable — using main model", cause] };
   }
 
+  private fallbackSelect(
+    catalog: CapabilityCatalog,
+    current: CapabilityBitmap,
+    available: CapabilityBitmap,
+    candidates: import("./selection").SelectableCapability[],
+  ): Omit<SelectDecision, "status" | "batches"> {
+    return buildFallbackDecision(catalog, current, available, candidates);
+  }
+
   async gate(input: GateInput): Promise<GateDecision & { result?: AskResult }> {
     const floor = staticVerdict(input.tool, { command: input.command, path: input.path }, this.root);
 
@@ -581,6 +604,66 @@ export class ReflexEngine {
     const decision = decideSteer(judgment.answers!, this.policy);
     this.recordSteer(decision.tier, decision.reasons, input.task, judgment.judgmentId, opts.resolveModelId);
     return { ...decision, result: judgment.result };
+  }
+
+  async select(input: SelectInput): Promise<SelectDecision> {
+    const candidates = eligibleForSelection(input.catalog, input.available, input.baseline, input.explicit);
+    if (candidates.length === 0) {
+      const empty = createBitmap(input.catalog.catalogHash, input.catalog.entries.length);
+      return { evaluated: empty, recommended: empty, scores: {}, reasons: {}, status: "ok", batches: 0 };
+    }
+
+    const batches = batchCandidates(candidates, SELECT_BATCH_CHAR_BUDGET);
+    const mergedAnswers: Record<string, Answer> = {};
+    let completedCount = 0;
+    let lastJudgmentId: string | undefined;
+    const subject = input.task.slice(0, 80);
+
+    for (const batch of batches) {
+      const questions = buildSelectQuestions(batch);
+      const descriptors = batch.map((c) => ({
+        id: c.descriptor.id,
+        description: c.descriptor.description,
+        useWhen: c.descriptor.useWhen,
+        avoidWhen: c.descriptor.avoidWhen,
+      }));
+      const state = {
+        task: input.task,
+        recent: input.recent,
+        ...(input.discoveryQuery !== undefined ? { discoveryQuery: input.discoveryQuery } : {}),
+        candidates: descriptors,
+      };
+      const judgment = await this.request("select", subject, state, questions);
+      lastJudgmentId = judgment.judgmentId;
+      if (judgment.status === "completed" && judgment.answers) {
+        completedCount++;
+        Object.assign(mergedAnswers, judgment.answers);
+      }
+    }
+
+    if (completedCount === 0) {
+      const partial = this.fallbackSelect(input.catalog, input.current, input.available, candidates);
+      const decision: SelectDecision = { ...partial, status: "unavailable", batches: batches.length };
+      this.recordDecision(
+        "select",
+        { action: decision.status, reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)] },
+        subject,
+        { judgmentId: lastJudgmentId },
+      );
+      return decision;
+    }
+
+    const { recommended, scores, reasons } = decideSelect(input.catalog, candidates, mergedAnswers, input.current, this.policy);
+    const evaluated = buildEvaluatedBitmap(input.catalog, candidates, mergedAnswers);
+    const status: SelectDecision["status"] = completedCount === batches.length ? "ok" : "partial";
+    const decision: SelectDecision = { evaluated, recommended, scores, reasons, status, batches: batches.length };
+    this.recordDecision(
+      "select",
+      { action: decision.status, reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)] },
+      subject,
+      { judgmentId: lastJudgmentId },
+    );
+    return decision;
   }
 
   private recordSteer(

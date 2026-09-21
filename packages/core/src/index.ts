@@ -85,3 +85,20 @@ export type {
   ReflexEngineDeps,
   ReflexIds,
 } from "./engine";
+export {
+  eligibleForSelection,
+  buildSelectQuestions,
+  decideSelect,
+  batchCandidates,
+  buildEvaluatedBitmap,
+  buildFallbackDecision,
+  encodeSelectId,
+  decodeSelectId,
+  SELECT_BATCH_CHAR_BUDGET,
+} from "./selection";
+export type {
+  SelectableCapability,
+  SelectInput,
+  SelectReason,
+  SelectDecision,
+} from "./selection";
