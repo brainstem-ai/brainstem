@@ -73,6 +73,20 @@ describe("isExhaustiveTask", () => {
     const manifest = splitIntoSections("x", "short");
     expect(isExhaustiveTask({ task: "summarize", intent: undefined, manifest })).toBe(true);
   });
+
+  test("a precision-seeking task ('what exact value...') does NOT trigger the exhaustive bypass", () => {
+    // "exact"/"exactly" signals precision, not exhaustiveness — this is the
+    // core case Focus exists to help with (find the one relevant fact), not
+    // a request to see everything. A regression here previously caused most
+    // "give the exact X" tasks to silently fall back to the naive bounded
+    // view instead of a real selection.
+    const manifest = manifestFrom(
+      "alpha section with enough content to avoid the min-chars bypass ".repeat(10),
+      "beta section with enough content to avoid the min-chars bypass ".repeat(10),
+    );
+    expect(isExhaustiveTask({ task: "What exact header value did the server return?", intent: undefined, manifest })).toBe(false);
+    expect(isExhaustiveTask({ task: "Give the exact rollback reason.", intent: undefined, manifest })).toBe(false);
+  });
 });
 
 describe("section id encoding", () => {
