@@ -32,6 +32,11 @@ export interface Policy {
     addNoul: number;
     retainNoul: number;
   };
+  // Experimental pilot defaults for structural-output focus. Not production-calibrated.
+  focus: {
+    relevanceNoul: number;
+    minChars: number;
+  };
   jev: {
     deadlineMs: number;
     // Reserved for P10; this unit keeps retries disabled.
@@ -81,6 +86,11 @@ export function policyForTrust(trust: number): Policy {
   select: {
     addNoul: 0.65,
     retainNoul: 0.45,
+  },
+  // Experimental pilot defaults for structural-output focus. Not production-calibrated.
+  focus: {
+    relevanceNoul: 0.6,
+    minChars: 800,
   },
   jev: {
     deadlineMs: 1500,

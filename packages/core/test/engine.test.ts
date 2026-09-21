@@ -10,6 +10,7 @@ import type { Answer, Question } from "../src/types";
 import { compileCatalog, type CapabilityDescriptor } from "../src/capabilities";
 import { createBitmap, fromIds } from "../src/bitmap";
 import { encodeSelectId, SELECT_BATCH_CHAR_BUDGET } from "../src/selection";
+import { splitIntoSections } from "../src/output-sections";
 
 const POLICY = policyForTrust(0.3);
 
@@ -546,5 +547,77 @@ describe("ReflexEngine.select", () => {
 
     const events = loadJournal(journalPath);
     expect(events.filter((e) => e.t === "reflex" && e.reflex === "select")).toHaveLength(2);
+  });
+});
+
+function focusManifest(...paragraphs: string[]) {
+  return splitIntoSections("focus-engine", paragraphs.join("\n\n"));
+}
+
+function focusEngineWith(script: (state: unknown, questions: Record<string, import("../src/types").Question>) => Record<string, import("../src/types").Answer>) {
+  const mock = mockSystemOne(script);
+  dir = mkdtempSync(join(tmpdir(), "brainstem-engine-focus-"));
+  const journalPath = join(dir, "session.ndjson");
+  const journal = openJournal(journalPath);
+  const engine = new ReflexEngine({ systemOne: mock, journal, policy: POLICY, root: dir });
+  return { mock, journalPath, engine };
+}
+
+describe("ReflexEngine.focus", () => {
+  test("selects sections and journals one reflex + decision per batch", async () => {
+    const manifest = focusManifest(
+      "alpha section with enough text to avoid the exhaustive small-manifest bypass ".repeat(7).trim(),
+      "beta section with enough text to avoid the exhaustive small-manifest bypass ".repeat(7).trim(),
+    );
+    const { engine, journalPath, mock } = focusEngineWith((_state, questions) => {
+      const answers: Record<string, import("../src/types").Answer> = {};
+      for (const id of Object.keys(questions)) {
+        answers[id] = noulAnswer(0.9);
+      }
+      return answers;
+    });
+
+    const decision = await engine.focus({
+      task: "did the tests pass",
+      command: "npm test",
+      outcome: "ok",
+      recentFindings: [],
+      manifest,
+      budgetChars: 10_000,
+    });
+
+    expect(decision.status).toBe("ok");
+    expect(decision.batches).toBe(1);
+    expect(decision.mode).toBe("select");
+    expect(mock.calls).toHaveLength(1);
+
+    const events = loadJournal(journalPath);
+    const reflexes = events.filter((e) => e.t === "reflex" && e.reflex === "focus");
+    const decisions = events.filter((e) => e.t === "decision" && e.reflex === "focus");
+    expect(reflexes).toHaveLength(1);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.t === "decision" && decisions[0].judgmentId).toBe(reflexes[0]?.t === "reflex" ? reflexes[0].judgmentId : undefined);
+  });
+
+  test("exhaustive bypass makes zero SystemOne calls and journals no reflex", async () => {
+    const manifest = focusManifest(...Array.from({ length: 20 }, (_, i) => `paragraph ${i}`));
+    const { engine, journalPath, mock } = focusEngineWith(() => ({}));
+
+    const decision = await engine.focus({
+      task: "count how many tests failed",
+      command: "npm test",
+      outcome: "ok",
+      recentFindings: [],
+      manifest,
+      budgetChars: 10_000,
+    });
+
+    expect(decision.mode).toBe("full");
+    expect(decision.status).toBe("ok");
+    expect(decision.batches).toBe(0);
+    expect(mock.calls).toHaveLength(0);
+    const events = loadJournal(journalPath);
+    expect(events.filter((e) => e.t === "reflex")).toHaveLength(0);
+    expect(events.filter((e) => e.t === "decision" && e.reflex === "focus")).toHaveLength(1);
   });
 });
