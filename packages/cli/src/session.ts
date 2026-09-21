@@ -1,7 +1,11 @@
-import { hashAction, newId, type Journal, type Policy, type TaskState, type ToolObservation } from "@brainstem/core";
+import { hashAction, newId, type Journal, type Policy, type PulseFacts, type TaskState, type ToolObservation } from "@brainstem/core";
 import type { TurnSpans } from "@brainstem/core";
 
 const OBSERVATION_MEMORY = 50;
+const ACTION_MEMORY = 50;
+// Pulse compares the last window of actions against the window before it.
+const APPROACH_WINDOW = 3;
+const TOP_FACTS = 5;
 
 export interface SessionRecorderOptions {
   policy: Policy;
@@ -15,6 +19,9 @@ export class SessionRecorder {
   private readonly journal: Journal;
   private readonly startedAt = Date.now();
   private readonly repeatedCounts = new Map<string, number>();
+  private readonly actionLabels = new Map<string, string>();
+  private readonly actionSequence: string[] = [];
+  private readonly failureCounts = new Map<string, { count: number; summary: string }>();
   private readonly observations: ToolObservation[] = [];
   private currentTaskState: TaskState | undefined;
   private activeTurnId: string | undefined;
@@ -140,8 +147,13 @@ export class SessionRecorder {
     else this.costKnown += cost;
   }
 
-  recordAction(actionHash: string): void {
+  recordAction(actionHash: string, label?: string): void {
     this.repeatedCounts.set(actionHash, (this.repeatedCounts.get(actionHash) ?? 0) + 1);
+    if (label !== undefined && !this.actionLabels.has(actionHash)) this.actionLabels.set(actionHash, label);
+    this.actionSequence.push(actionHash);
+    if (this.actionSequence.length > ACTION_MEMORY) {
+      this.actionSequence.splice(0, this.actionSequence.length - ACTION_MEMORY);
+    }
   }
 
   recordObservation(observation: ToolObservation): void {
@@ -149,10 +161,62 @@ export class SessionRecorder {
     if (this.observations.length > OBSERVATION_MEMORY) {
       this.observations.splice(0, this.observations.length - OBSERVATION_MEMORY);
     }
+    if (observation.status !== "ok") {
+      // A failure fingerprint is exit status plus the first non-empty output line:
+      // the same command failing the same way twice is the signal Pulse needs, and
+      // the trailing noise that differs between runs must not split the group.
+      const firstLine = observation.excerpt.split("\n").find((line) => line.trim() !== "")?.slice(0, 200) ?? "";
+      const fingerprint = hashAction({
+        status: observation.status,
+        exitCode: observation.exitCode ?? null,
+        firstLine,
+      }).slice(0, 12);
+      const summary = `${observation.status}${observation.exitCode !== undefined ? ` exit ${observation.exitCode}` : ""}: ${firstLine || "(no output)"}`;
+      const existing = this.failureCounts.get(fingerprint);
+      this.failureCounts.set(fingerprint, { count: (existing?.count ?? 0) + 1, summary });
+    }
   }
 
   recentActivity(n: number): string[] {
     return this.observations.slice(-n).map((obs) => observationLine(obs));
+  }
+
+  get recentActionHashes(): string[] {
+    return [...this.actionSequence];
+  }
+
+  /** True when the last window of actions shares no action with the window before it. */
+  approachChanged(): boolean {
+    const earlier = this.actionSequence.slice(-APPROACH_WINDOW * 2, -APPROACH_WINDOW);
+    if (earlier.length === 0) return false;
+    const recent = this.actionSequence.slice(-APPROACH_WINDOW);
+    const seen = new Set(earlier);
+    return recent.every((hash) => !seen.has(hash));
+  }
+
+  /** Structured facts for Pulse. Code computes every count here; Jev never counts. */
+  pulseFacts(n = 5): PulseFacts {
+    const repeatedActionCounts = [...this.repeatedCounts.entries()]
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, TOP_FACTS)
+      .map(([hash, count]) => ({ label: this.actionLabels.get(hash) ?? hash.slice(0, 12), count }));
+
+    const failureFingerprints = [...this.failureCounts.entries()]
+      .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+      .slice(0, TOP_FACTS)
+      .map(([fingerprint, entry]) => ({ fingerprint: `${fingerprint} ${entry.summary}`, count: entry.count }));
+
+    return {
+      recentActions: this.observations.slice(-n).map((obs) => ({
+        tool: obs.tool,
+        summary: subjectOf(obs),
+        status: obs.status,
+      })),
+      repeatedActionCounts,
+      failureFingerprints,
+      approachChanged: this.approachChanged(),
+    };
   }
 
   endSession(reason: "normal" | "error", error?: string): void {
@@ -167,9 +231,13 @@ export class SessionRecorder {
   }
 }
 
-function observationLine(obs: ToolObservation): string {
+export function subjectOf(obs: ToolObservation): string {
   const args = (obs.argsSummary ?? {}) as { command?: string; path?: string; pattern?: string };
-  const subject = args.command ?? args.path ?? args.pattern ?? JSON.stringify(obs.argsSummary ?? {}).slice(0, 80);
+  return args.command ?? args.path ?? args.pattern ?? JSON.stringify(obs.argsSummary ?? {}).slice(0, 80);
+}
+
+function observationLine(obs: ToolObservation): string {
+  const subject = subjectOf(obs);
   if (obs.status === "blocked") return `${obs.tool}: ${subject} (blocked)`;
   const timing = `(${obs.exitCode !== undefined ? `exit ${obs.exitCode}` : obs.status}, ${(obs.durationMs / 1000).toFixed(1)}s)`;
   return `${obs.tool}: ${subject} ${timing}`;

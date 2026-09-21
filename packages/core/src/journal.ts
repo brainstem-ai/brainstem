@@ -67,6 +67,8 @@ export type JournalEvent =
       reasons: string[];
       staticVerdict?: StaticVerdict;
       approvalId?: string;
+      // For steer: the model id that actually served the request after tier routing.
+      model?: string;
     }
   | {
       t: "approval";
