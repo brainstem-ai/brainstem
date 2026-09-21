@@ -23,7 +23,15 @@ export interface RegisterInput {
   schema?: unknown;
 }
 
-export const BASELINE_TOOL_IDS = ["tool:bash", "tool:read", "tool:write", "tool:grep", "tool:glob"] as const;
+export const BASELINE_TOOL_IDS = [
+  "tool:bash",
+  "tool:read",
+  "tool:write",
+  "tool:grep",
+  "tool:glob",
+  "tool:read_output",
+  "tool:search_output",
+] as const;
 
 const BASELINE_TOOLS: RegisterInput[] = [
   {
@@ -75,6 +83,26 @@ const BASELINE_TOOLS: RegisterInput[] = [
     avoidWhen: ["You need file contents (use read)"],
     alwaysAvailable: true,
     schema: { name: "glob", description: "List files matching a glob pattern." },
+  },
+  {
+    id: "tool:read_output",
+    kind: "tool",
+    version: "1.0.0",
+    description: "Recover lines from a previously captured tool output artifact.",
+    useWhen: ["A capture notice says output was bounded and you need omitted lines"],
+    avoidWhen: ["The content is on disk (use read)"],
+    alwaysAvailable: true,
+    schema: { name: "read_output", description: "Recover lines from a previously captured tool output artifact." },
+  },
+  {
+    id: "tool:search_output",
+    kind: "tool",
+    version: "1.0.0",
+    description: "Search a previously captured tool output artifact with a regular expression.",
+    useWhen: ["You need to locate content inside a bounded capture"],
+    avoidWhen: ["The content is on disk (use grep)"],
+    alwaysAvailable: true,
+    schema: { name: "search_output", description: "Search a previously captured tool output artifact with a regular expression." },
   },
 ];
 

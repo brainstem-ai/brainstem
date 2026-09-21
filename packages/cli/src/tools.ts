@@ -32,7 +32,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
       timeout_ms: Type.Optional(Type.Number({ description: "Timeout in milliseconds (default 60000)" })),
     });
 
-  function collectStream(stream: NodeJS.ReadableStream, limit: number): Promise<{ text: string; truncated: boolean }> {
+  function collectStream(stream: NodeJS.ReadableStream, limit: number): Promise<{ text: string; truncated: boolean; bytes: number }> {
     return new Promise((resolve) => {
       const chunks: Buffer[] = [];
       let total = 0;
@@ -41,7 +41,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
       const finish = () => {
         if (done) return;
         done = true;
-        resolve({ text: Buffer.concat(chunks).toString("utf8"), truncated: total > limit });
+        resolve({ text: Buffer.concat(chunks).toString("utf8"), truncated: total > limit, bytes: retained });
       };
       stream.on("data", (d: Buffer) => {
         total += d.length;
@@ -94,7 +94,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
       if (error && !signal?.aborted && !timeoutSignal.aborted) {
         return {
           content: [{ type: "text", text: cap(`${error.message}\n${err.text}`.trim(), OUTPUT_CAP) || "(no output)" }],
-          details: { exit: -1, status: "error" as const, durationMs, truncated },
+          details: { exit: -1, status: "error" as const, durationMs, truncated, stdoutBytes: out.bytes, stderrBytes: err.bytes },
         };
       }
 
@@ -108,7 +108,7 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
 
       return {
         content: [{ type: "text", text: combined || "(no output)" }],
-        details: { exit: code, status, durationMs, truncated },
+        details: { exit: code, status, durationMs, truncated, stdoutBytes: out.bytes, stderrBytes: err.bytes },
       };
     },
   };
