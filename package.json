@@ -10,6 +10,8 @@
     "eval:live": "bun run experiments/evals/live-scenarios.ts",
     "eval:cache-benchmark": "bun run experiments/evals/cache-benchmark.ts",
     "eval:select": "bun run experiments/evals/select-value.ts",
+    "eval:select-vs-self": "bun run experiments/evals/select-vs-selfselect.ts",
+    "eval:select-ambiguity": "bun run experiments/evals/select-ambiguity.ts",
     "eval:with-without": "bun run experiments/evals/with-without-harness.ts",
     "eval:focus-vs-rtk": "bun run experiments/evals/focus-vs-rtk.ts",
     "test": "vitest run",

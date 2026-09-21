@@ -58,6 +58,27 @@ Real calls, one batched Jev call, negligible cost. Registers 5 optional tools ag
 
 Measured 2026-09-21: all 5 correctly classified (relevant tool scored 0.93, decoys scored 0.02–0.04). Optional-tool schema overhead dropped from 526 bytes (naive: expose everything registered) to 87 bytes (Select-filtered). A real registry with more integrations would show a larger absolute reduction — this is one scenario with 5 candidates, not a claim about arbitrary registry size.
 
+## Select vs self-selection
+
+```sh
+bun run eval:select-vs-self
+bun run eval:select-ambiguity
+```
+
+Real calls, both scripts. `select-value.ts` only checked whether Select alone gets it right; these two check whether Select actually **beats a raw agent self-selecting** — the harder, more honest question. Both use `_fixtures/messaging-registry.ts`: 27 optional tools (1 correct — post to Slack — 4 same-domain near-misses, 22 unrelated decoys) registered against a real `CapabilityRegistry`. Three conditions each run: a raw Pi `Agent` (same tools/model, zero Jev) given all 27, Select alone (one batched Jev call), and a harnessed agent given Select's filtered set.
+
+`select-vs-self` uses an explicit task ("...in the #eng **Slack channel**..."). `select-ambiguity` uses a deliberately harder one — no literal "Slack"/"channel" keyword, only the "#eng" naming convention, plus a planted distractor ("usually we'd **email**... but this time just ping #eng directly").
+
+Measured 2026-09-21 (`zai/glm-5.3`, 3 runs for the explicit task, 5 for the ambiguous one):
+
+| | explicit task | ambiguous task + distractor |
+|---|---|---|
+| raw agent (27 tools shown) | 3/3 correct | 5/5 correct, 0/5 fell for the distractor |
+| Select alone | correct, all 27 classified right | 5/5 correct, decisively (`0.97` vs `0.05-0.06` every run) |
+| harnessed agent (Select-filtered) | 3/3 correct | 4/5 correct (1 run made no tool call — a different failure mode, likely a conversational reply instead of a tool invocation; not root-caused) |
+
+**Honest conclusion, not spun**: neither test found a raw-agent accuracy failure. `zai/glm-5.3` wasn't fooled by 27 tools, near-misses, implicit signals, or a planted distractor across 8 raw-agent runs total. Select's own judgment was consistently confident and correct in every run, which is a real, positive finding about Jev's discrimination quality — but it hasn't translated into a demonstrated accuracy *advantage* over this particular main model at this scale. The scenario that would actually isolate that variable — a weaker/cheaper main model, or a much larger catalog (100+ tools) — hasn't been tried; both tests used the same competent model on both sides. What's proven regardless of accuracy parity: the schema/token cost savings from not showing the model 26 irrelevant tools every call.
+
 ## With/without harness (prompt injection)
 
 ```sh
