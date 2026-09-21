@@ -47,7 +47,12 @@ export interface FocusDecision {
 export const FOCUS_MIN_CHARS = 800;
 export const FOCUS_BATCH_CHAR_BUDGET = 6_000;
 
-const EXHAUSTIVE_PATTERN = /\ball\b|\bevery\b|\bexact(ly)?\b|\bcomplete list\b|\bfull output\b|\bhow many\b|\bcount\b/i;
+// "exact"/"exactly" is deliberately absent: it signals precision-seeking
+// ("what exact value did X return") — the core case Focus exists to help
+// with — not exhaustiveness. A task asking for one exact fact still needs
+// selective evidence, not the full bounded view. Genuinely exhaustive
+// phrasings are already covered by the other terms below.
+const EXHAUSTIVE_PATTERN = /\ball\b|\bevery\b|\bcomplete list\b|\bfull output\b|\bhow many\b|\bcount\b/i;
 
 export function isExhaustiveTask(input: Pick<FocusInput, "task" | "intent" | "manifest">): boolean {
   if (EXHAUSTIVE_PATTERN.test(input.task) || EXHAUSTIVE_PATTERN.test(input.intent ?? "")) return true;
