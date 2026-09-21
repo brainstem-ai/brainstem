@@ -8,6 +8,7 @@ const POLICY = policyForTrust(0.3);
 
 const healthyPulse: Record<string, Answer> = {
   repeating: noulAnswer(0.05),
+  approach_changed: noulAnswer(0.05),
   progressing: noulAnswer(0.9),
   stuck_on_same_error: noulAnswer(0.02),
   worth_continuing: scoreAnswer(2.0, 0.9),
@@ -18,10 +19,29 @@ describe("decidePulse", () => {
     expect(decidePulse(healthyPulse, POLICY).action).toBe("continue");
   });
 
-  test("intervenes when the agent repeats itself", () => {
+  test("intervenes when the agent repeats itself, naming the repeated action", () => {
+    const d = decidePulse(
+      { ...healthyPulse, repeating: noulAnswer(0.85) },
+      POLICY,
+      { repeatedAction: { label: "npm test", count: 3 } },
+    );
+    expect(d.action).toBe("intervene");
+    expect(d.reasons[0]).toBe("repeating: npm test x3");
+  });
+
+  test("falls back to the numeric reason when no repeated action fact exists", () => {
     const d = decidePulse({ ...healthyPulse, repeating: noulAnswer(0.85) }, POLICY);
     expect(d.action).toBe("intervene");
-    expect(d.reasons[0]).toContain("repeating");
+    expect(d.reasons[0]).toContain("repeating=");
+  });
+
+  test("does not intervene for repeating when the approach changed", () => {
+    const d = decidePulse(
+      { ...healthyPulse, repeating: noulAnswer(0.85), approach_changed: noulAnswer(0.9) },
+      POLICY,
+      { repeatedAction: { label: "npm test", count: 3 } },
+    );
+    expect(d.action).toBe("continue");
   });
 
   test("intervenes when stuck on the same error", () => {
@@ -51,19 +71,66 @@ describe("decidePulse", () => {
 
 describe("decideVerify", () => {
   test("confirms a satisfying result", () => {
-    const d = decideVerify({ satisfies_intent: noulAnswer(0.95), result_quality: scoreAnswer(2.0, 0.9) }, POLICY);
+    const d = decideVerify(
+      {
+        satisfies_intent: noulAnswer(0.95),
+        evidence_of_success: noulAnswer(0.9),
+        result_quality: scoreAnswer(2.0, 0.9),
+      },
+      POLICY,
+    );
     expect(d.action).toBe("ok");
   });
 
-  test("flags a result that does not satisfy the intent", () => {
-    const d = decideVerify({ satisfies_intent: noulAnswer(0.15), result_quality: scoreAnswer(0.0, 0.8) }, POLICY);
+  test("flags a genuine mismatch: low satisfaction AND low success evidence", () => {
+    const d = decideVerify(
+      {
+        satisfies_intent: noulAnswer(0.15),
+        evidence_of_success: noulAnswer(0.1),
+        result_quality: scoreAnswer(0.0, 0.8),
+      },
+      POLICY,
+    );
     expect(d.action).toBe("mismatch");
-    expect(d.reasons[0]).toContain("satisfies_intent");
+    expect(d.reasons.some((r) => r.includes("satisfies_intent"))).toBe(true);
   });
 
-  test("does not act on low-confidence mismatch (confidence gating)", () => {
-    const answer: Answer = { type: "noul", noul: 0.3 };
-    const d = decideVerify({ satisfies_intent: answer, result_quality: scoreAnswer(1.0, 0.4) }, POLICY);
+  test("operational failure with satisfying reproduction is ok, with the failure recorded as a reason", () => {
+    const d = decideVerify(
+      {
+        satisfies_intent: noulAnswer(0.9),
+        evidence_of_success: noulAnswer(0.85),
+        operational_failure: noulAnswer(0.95),
+        result_quality: scoreAnswer(2.0, 0.9),
+      },
+      POLICY,
+    );
+    expect(d.action).toBe("ok");
+    expect(d.reasons.some((r) => r.includes("operational failure"))).toBe(true);
+  });
+
+  test("operational failure does not rescue a genuine mismatch", () => {
+    const d = decideVerify(
+      {
+        satisfies_intent: noulAnswer(0.1),
+        evidence_of_success: noulAnswer(0.05),
+        operational_failure: noulAnswer(0.9),
+      },
+      POLICY,
+    );
+    expect(d.action).toBe("mismatch");
+    expect(d.reasons.some((r) => r.includes("operational failure"))).toBe(true);
+  });
+
+  test("low satisfaction with strong success evidence is not a mismatch", () => {
+    const d = decideVerify(
+      {
+        satisfies_intent: noulAnswer(0.3),
+        evidence_of_success: noulAnswer(0.9),
+        result_quality: scoreAnswer(1.0, 0.4),
+      },
+      POLICY,
+    );
     expect(d.action).toBe("ok");
   });
 });
