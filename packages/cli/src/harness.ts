@@ -7,6 +7,10 @@ import {
   openJournal,
   policyForTrust,
   staticVerdict,
+  type ApprovalHandler,
+  type ApprovalRequest,
+  type ApprovalResolution,
+  type ApprovalStatus,
   type Journal,
   type SystemOne,
   type ToolObservation,
@@ -28,6 +32,7 @@ export interface HarnessOptions {
   cwd: string;
   systemPrompt?: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  approvalHandler?: ApprovalHandler;
   pulseEveryTurns?: number;
   onReflex?: (line: string) => void;
   onDelta?: (delta: string) => void;
@@ -39,6 +44,7 @@ export interface Harness {
   journal: Journal;
   recorder: SessionRecorder;
   journalPath: string;
+  approvalsRequested(): number;
   prompt(text: string): Promise<void>;
   endSession(reason?: "normal" | "error", error?: string): void;
 }
@@ -67,6 +73,28 @@ function argsSummaryFor(args: unknown): unknown {
   if (args === null || typeof args !== "object") return args ?? {};
   const { content: _content, ...rest } = args as Record<string, unknown>;
   return rest;
+}
+
+function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new Error("aborted"));
+      return;
+    }
+    const onAbort = () => reject(new Error("aborted"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
 }
 
 export function createHarness(options: HarnessOptions): Harness {
@@ -108,6 +136,7 @@ export function createHarness(options: HarnessOptions): Harness {
   let turnsCompleted = 0;
   let turnJevMs = 0;
   let turnModelMs = 0;
+  let approvalsRequestedCount = 0;
 
   async function timedJev<T>(fn: () => Promise<T>): Promise<T> {
     const t0 = performance.now();
@@ -172,6 +201,79 @@ export function createHarness(options: HarnessOptions): Harness {
     );
   }
 
+  async function runApproval(
+    toolCallId: string,
+    tool: string,
+    args: unknown,
+    reasons: string[],
+    signal: AbortSignal | undefined,
+  ): Promise<{ block: true; reason: string } | undefined> {
+    // Approval binds to the validated args of this beforeToolCall invocation: args
+    // are fixed within one hook call, so the hash recorded at request time is
+    // re-checked at resolution time against those same validated inputs.
+    const approvalId = newId("appr");
+    const taskId = recorder.currentTask?.id ?? "";
+    const actionHash = hashAction({ tool, args: argsSummaryFor(args) });
+    const request: ApprovalRequest = {
+      id: approvalId,
+      taskId,
+      toolCallId,
+      cwd: options.cwd,
+      tool,
+      validatedArgs: args ?? {},
+      actionHash,
+      reasons,
+    };
+    approvalsRequestedCount += 1;
+    const appendApproval = (status: ApprovalStatus, why?: string) =>
+      journal.append({
+        t: "approval",
+        v: 2,
+        approvalId,
+        ts: Date.now(),
+        status,
+        taskId,
+        toolCallId,
+        actionHash,
+        reasons: why !== undefined ? [why] : reasons,
+      });
+    appendApproval("requested");
+
+    if (!options.approvalHandler) {
+      appendApproval("invalidated", "no handler");
+      const reason = gateBlock(`needs approval: ${reasons.join("; ")}`).reason;
+      emitBlockedObservation(toolCallId, tool, args, reason, "gate ask: no approval handler");
+      return { block: true, reason };
+    }
+
+    let resolution: ApprovalResolution;
+    try {
+      resolution = await withAbort(options.approvalHandler(request), signal);
+    } catch {
+      appendApproval("cancelled", "handler threw or caller aborted");
+      const reason = "[brainstem] approval cancelled";
+      emitBlockedObservation(toolCallId, tool, args, reason, "approval cancelled");
+      return { block: true, reason };
+    }
+
+    if (hashAction({ tool, args: argsSummaryFor(args) }) !== actionHash) {
+      appendApproval("invalidated", "action changed since request");
+      const reason = "[brainstem] approval cancelled";
+      emitBlockedObservation(toolCallId, tool, args, reason, "action changed since approval request");
+      return { block: true, reason };
+    }
+
+    if (resolution === "approve_once") {
+      appendApproval("approved");
+      return undefined;
+    }
+
+    appendApproval("denied", "denied by user");
+    const reason = "[brainstem] denied by user";
+    emitBlockedObservation(toolCallId, tool, args, reason, "denied by user");
+    return { block: true, reason };
+  }
+
   const innerStreamFn = options.streamFn;
   let modelStartedAt = 0;
   let firstTokenAt: number | undefined;
@@ -226,7 +328,7 @@ export function createHarness(options: HarnessOptions): Harness {
       }
       return false;
     },
-    beforeToolCall: async ({ toolCall, args }) => {
+    beforeToolCall: async ({ toolCall, args }, signal) => {
       const a = (args ?? {}) as { command?: string; path?: string };
       const toolCallId = toolCall.id;
 
@@ -240,13 +342,13 @@ export function createHarness(options: HarnessOptions): Harness {
           }),
         );
         options.onReflex?.(render("gate", decision.action, decision.reasons));
-        if (decision.action === "deny" || decision.action === "ask") {
-          const reason =
-            decision.action === "deny"
-              ? `[brainstem] denied: ${decision.reasons.join("; ")}. Do not retry this command.`
-              : gateBlock(`needs approval: ${decision.reasons.join("; ")}`).reason;
-          emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate ${decision.action}: ${decision.reasons.join("; ")}`);
+        if (decision.action === "deny") {
+          const reason = `[brainstem] denied: ${decision.reasons.join("; ")}. Do not retry this command.`;
+          emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${decision.reasons.join("; ")}`);
           return { block: true, reason };
+        }
+        if (decision.action === "ask") {
+          return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal);
         }
         return undefined;
       }
@@ -383,8 +485,9 @@ export function createHarness(options: HarnessOptions): Harness {
     journal,
     recorder,
     journalPath: options.journalPath,
+    approvalsRequested: () => approvalsRequestedCount,
     async prompt(text: string) {
-      if (recorder.currentTask?.objective !== text) recorder.startTask(text);
+      recorder.startTask(text);
       turnJevMs = 0;
       turnModelMs = 0;
       recorder.beginTurn();
