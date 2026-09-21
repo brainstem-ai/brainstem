@@ -2,12 +2,22 @@
   "name": "@brainstem/reflexes",
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "files": ["dist"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./judges/generic": "./src/judges/generic.ts"
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./judges/generic": { "types": "./dist/judges/generic.d.ts", "import": "./dist/judges/generic.js" }
+  },
+  "scripts": {
+    "build": "tsup"
   },
   "dependencies": {
-    "@brainstem/core": "workspace:*",
+    "@brainstem/core": "^0.1.0",
     "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
   }
 }

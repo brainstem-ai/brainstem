@@ -2,8 +2,20 @@
   "name": "@brainstem/core",
   "version": "0.1.0",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "license": "MIT",
+  "files": ["dist"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "scripts": {
+    "build": "tsup"
+  },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
   }
 }
