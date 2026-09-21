@@ -12,6 +12,7 @@ export type { MockSystemOne } from "./providers/mock";
 export { openJournal, appendJournalEvent, loadJournal, JOURNAL_SCHEMA_VERSION } from "./journal";
 export type { Journal, JournalEvent, TurnSpans, ReflexStatus, ApprovalStatus } from "./journal";
 export { hashAction, canonicalJson, newId } from "./evidence";
+export type { ApprovalResolution, ApprovalRequest, ApprovalHandler } from "./approval";
 export type { TaskState, ToolObservation, ToolStatus } from "./evidence";
 export { gateQuestions, sanitizeQuestions, pulseQuestions, steerQuestions, verifyQuestions, GATE_DISPOSITION_CRITERIA, SANITIZE_SEVERITY_LEVELS, CONTINUING_LEVELS } from "./questions";
 export { policyForTrust, DEFAULT_TRUST } from "./policy";
