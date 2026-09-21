@@ -11,6 +11,7 @@
     "eval:cache-benchmark": "bun run experiments/evals/cache-benchmark.ts",
     "eval:select": "bun run experiments/evals/select-value.ts",
     "eval:with-without": "bun run experiments/evals/with-without-harness.ts",
+    "eval:focus-vs-rtk": "bun run experiments/evals/focus-vs-rtk.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
