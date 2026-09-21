@@ -18,6 +18,8 @@ export type { BudgetState, BudgetLimits, BudgetCheck } from "./budgets";
 export { openJournal, appendJournalEvent, loadJournal, JOURNAL_SCHEMA_VERSION } from "./journal";
 export type { Journal, JournalEvent, TurnSpans, ReflexStatus, ApprovalStatus } from "./journal";
 export { hashAction, canonicalJson, newId } from "./evidence";
+export { contentHash, countLines, searchContent, sliceByLines, InvalidPatternError } from "./artifacts";
+export type { ArtifactMeta, ArtifactRecord, ArtifactEntry, ArtifactStore } from "./artifacts";
 export type { ApprovalResolution, ApprovalRequest, ApprovalHandler } from "./approval";
 export type { TaskState, ToolObservation, ToolStatus } from "./evidence";
 export {
