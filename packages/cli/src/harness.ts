@@ -29,6 +29,7 @@ export interface HarnessOptions {
   systemPrompt?: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   pulseEveryTurns?: number;
+  signal?: AbortSignal;
   onReflex?: (line: string) => void;
   onDelta?: (delta: string) => void;
 }
@@ -86,6 +87,8 @@ export function createHarness(options: HarnessOptions): Harness {
       ...(recorder.currentTask !== undefined ? { taskId: recorder.currentTask.id } : {}),
       ...(recorder.currentTurnId !== undefined ? { turnId: recorder.currentTurnId } : {}),
     }),
+    budgets: policy.budgets,
+    signal: options.signal,
   });
 
   const taskText = () => recorder.currentTask?.objective ?? "unspecified";
@@ -178,6 +181,7 @@ export function createHarness(options: HarnessOptions): Harness {
   const routedStreamFn: StreamFn = async (model, context, streamOptions) => {
     modelStartedAt = performance.now();
     firstTokenAt = undefined;
+    engine.noteModelCall();
     if (options.miniModel) {
       const decision = await timedJev(() =>
         engine.steer({ task: taskText(), events: summarizeMessages(context.messages) }),
@@ -301,6 +305,8 @@ export function createHarness(options: HarnessOptions): Harness {
         options.onReflex?.(render("sanitize", observed.sanitize.action, observed.sanitize.reasons));
         if (observed.verify.action === "mismatch") {
           options.onReflex?.(render("verify", observed.verify.action, observed.verify.reasons));
+        } else if (!observed.verify.verified) {
+          options.onReflex?.(render("verify", "unavailable", observed.verify.reasons));
         }
 
         if (observed.sanitize.action === "block") {
@@ -318,6 +324,9 @@ export function createHarness(options: HarnessOptions): Harness {
               `[brainstem] verify: this output may not satisfy what the tool call was trying to do (${observed.verify.reasons.join("; ")}). Consider a different approach if progress stalls.`,
             );
             deliveredWhy ??= "verify notes prepended";
+          } else if (!observed.verify.verified) {
+            notes.push("[brainstem] verify: unavailable — result not verified");
+            deliveredWhy ??= "verify unavailable notes prepended";
           }
           if (notes.length > 0) {
             deliveredExcerpt = `${notes.join("\n")}\n\n${obs.excerpt}`;
