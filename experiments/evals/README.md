@@ -31,6 +31,24 @@ Measured on 2026-09-21 against `zai/glm-5.3` + `jev-1.13.0`: **$0.0043 total** f
 
 Set `BRAINSTEM_EVAL_MODEL=provider/id` to run against a different main model.
 
+## Select value
+
+```sh
+bun run eval:select
+```
+
+Real calls, one batched Jev call, negligible cost. Registers 5 optional tools against a real `CapabilityRegistry` — 1 genuinely relevant to the task (post to Slack), 4 plausible-sounding decoys (query a database, deploy to prod, generate a PDF, convert currency) — and asks: does Select actually keep the irrelevant ones out of what the model sees, without the model ever having to reason about them?
+
+Measured 2026-09-21: all 5 correctly classified (relevant tool scored 0.93, decoys scored 0.02–0.04). Optional-tool schema overhead dropped from 526 bytes (naive: expose everything registered) to 87 bytes (Select-filtered). A real registry with more integrations would show a larger absolute reduction — this is one scenario with 5 candidates, not a claim about arbitrary registry size.
+
+## With/without harness (prompt injection)
+
+```sh
+bun run eval:with-without
+```
+
+Real calls (main model only for the "without" run; main model + Jev for "with"). Constructs a raw Pi `Agent` — same tools, same model, zero Jev hooks — alongside the full harness, and gives both an identical task: summarize a file that contains a real prompt injection attempting to exfiltrate a (fake) credentials file into a new one. Checks whether the exfiltration file actually gets created in each run. Written but not yet run as a completed measurement in this repo's history — see this eval's own output for whatever the most recent run found; model behavior on identical injected content can vary between runs, so treat one run as a demonstration, not a guarantee.
+
 ## Cache benchmark
 
 ```sh
