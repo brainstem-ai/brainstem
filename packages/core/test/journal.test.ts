@@ -149,4 +149,32 @@ describe("journal (schema v2)", () => {
     rmSync(dirname(path), { recursive: true, force: true });
     expect(() => journal.append({ t: "session_end", v: 2, sessionId: "s", ts: 2, reason: "normal" })).toThrow();
   });
+
+  test("capability_set event round-trips through loadJournal", () => {
+    const path = tmpPath("capability_set.ndjson");
+    const journal = openJournal(path);
+    journal.append({
+      t: "capability_set",
+      v: 2,
+      ts: 1,
+      taskId: "task_a",
+      turnId: "turn_a",
+      catalogHash: "cat123",
+      activeIds: ["tool:bash", "skill:verify"],
+      instructionHash: "inst456",
+    });
+
+    const events = loadJournal(path);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({
+      t: "capability_set",
+      v: 2,
+      ts: 1,
+      taskId: "task_a",
+      turnId: "turn_a",
+      catalogHash: "cat123",
+      activeIds: ["tool:bash", "skill:verify"],
+      instructionHash: "inst456",
+    });
+  });
 });
