@@ -1,0 +1,31 @@
+{
+  "caseId": "search-override",
+  "arm": "jev",
+  "repeat": 0,
+  "textChars": 645,
+  "answer": "The deployment points to the old issuer because the environment file deploy/runtime.env sets AUTH_ISSUER_OVERRIDE, which overrides the production issuer with the legacy URI https://legacy.topaz-93.example/v1.",
+  "evidence": [
+    "deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1988.9742499999993,
+  "usage": {
+    "input": 339,
+    "output": 77,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 416,
+    "cost": {
+      "input": 0.000050849999999999996,
+      "output": 0.0000385,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00008935
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

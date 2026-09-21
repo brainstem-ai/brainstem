@@ -1,0 +1,60 @@
+{
+  "caseId": "git-rollback",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 196,
+  "answer": "The visible log excerpt does not show the connection-pool optimization commit or its rollback reason; retrieval is needed.",
+  "evidence": [],
+  "needMore": true,
+  "correct": false,
+  "grounded": false,
+  "latencyMs": 1499.4147919999996,
+  "usage": {
+    "input": 237,
+    "output": 50,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 14,
+    "totalTokens": 287,
+    "cost": {
+      "input": 0.00003555,
+      "output": 0.000024999999999999998,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.000060549999999999995
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "git-rollback",
+    "arm": "rtk",
+    "repeat": 0,
+    "textChars": 7771,
+    "answer": "Tenant-cedar-38 leaked lease counters during reconnect; do not retry until counter ownership is repaired.",
+    "evidence": [
+      "Rollback reason: tenant-cedar-38 leaked lease counters during reconnect"
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 1236.0585840000022,
+    "usage": {
+      "input": 2453,
+      "output": 48,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 2501,
+      "cost": {
+        "input": 0.00036794999999999997,
+        "output": 0.000024,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00039194999999999996
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

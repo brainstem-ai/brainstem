@@ -1,0 +1,6 @@
+PASS (46) FAIL (2)
+
+1.  FAIL  pilot.test.ts > authentication response uses the expected relay header
+2.  FAIL  pilot.test.ts > unrelated invoice rounds correctly
+
+Time: 641ms

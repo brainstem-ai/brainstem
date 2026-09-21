@@ -1,0 +1,31 @@
+{
+  "caseId": "search-negative",
+  "arm": "raw",
+  "repeat": 0,
+  "textChars": 11290,
+  "answer": "Not established: the search output shows the production issuer URL but no timeout value in milliseconds. Retrieval of production/config.ts (or related config) is needed to confirm the timeout.",
+  "evidence": [
+    "25:production/config.ts: issuer = https://issuer.pearl-46.example/v2"
+  ],
+  "needMore": true,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1847.3264590000035,
+  "usage": {
+    "input": 2972,
+    "output": 69,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3041,
+    "cost": {
+      "input": 0.0004458,
+      "output": 0.0000345,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0004803
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

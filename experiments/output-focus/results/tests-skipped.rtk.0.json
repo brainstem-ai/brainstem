@@ -1,0 +1,63 @@
+{
+  "caseId": "tests-skipped",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 174,
+  "answer": "The tool output does not show any skipped authorization test; it only lists 46 passed and 2 failed tests. An artifact view is needed to identify the skipped test's complete name.",
+  "evidence": [
+    "PASS (46) FAIL (2)"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 1693.724792000001,
+  "usage": {
+    "input": 215,
+    "output": 69,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 9,
+    "totalTokens": 284,
+    "cost": {
+      "input": 0.00003225,
+      "output": 0.0000345,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00006675
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "tests-skipped",
+    "arm": "rtk",
+    "repeat": 0,
+    "textChars": 4588,
+    "answer": "The skipped test was \"expired service token rejects marker violet-83\".",
+    "evidence": [
+      "test.skip('expired service token rejects marker violet-83', () => {});",
+      "↓ pilot.test.ts > expired service token rejects marker violet-83"
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 2112.1579170000005,
+    "usage": {
+      "input": 1613,
+      "output": 59,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 1672,
+      "cost": {
+        "input": 0.00024195,
+        "output": 0.0000295,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00027145
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

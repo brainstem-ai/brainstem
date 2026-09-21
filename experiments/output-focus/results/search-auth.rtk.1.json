@@ -1,0 +1,32 @@
+{
+  "caseId": "search-auth",
+  "arm": "rtk",
+  "repeat": 1,
+  "textChars": 11290,
+  "answer": "The configured production issuer in production/config.ts is https://issuer.pearl-46.example/v2. Note deploy/runtime.env sets an override https://legacy.topaz-93.example/v1; the production config value remains as asked.",
+  "evidence": [
+    "production/config.ts: issuer = https://issuer.pearl-46.example/v2",
+    "deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1552.8000410000022,
+  "usage": {
+    "input": 24,
+    "output": 101,
+    "cacheRead": 2944,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3069,
+    "cost": {
+      "input": 0.0000036,
+      "output": 0.0000505,
+      "cacheRead": 0.00008832,
+      "cacheWrite": 0,
+      "total": 0.00014241999999999998
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

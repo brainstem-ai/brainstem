@@ -1,0 +1,26 @@
+../../..<fixture>/compiler/authorization.ts(1,14): error TS2322: Type '"legacy-orchid-29"' is not assignable to type '"signed-jade-64"'.
+../../..<fixture>/compiler/billing.ts(2,35): error TS2561: Object literal may only specify known properties, but 'settlemantCode' does not exist in type 'Billing'. Did you mean to write 'settlementCode'?
+../../..<fixture>/compiler/noise-00.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-01.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-02.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-03.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-04.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-05.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-06.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-07.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-08.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-09.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-10.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-11.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-12.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-13.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-14.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-15.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-16.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-17.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-18.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-19.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-20.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-21.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-22.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+../../..<fixture>/compiler/noise-23.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.

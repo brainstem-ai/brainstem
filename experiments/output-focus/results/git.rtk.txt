@@ -1,0 +1,5 @@
+commit 633ca8b0bf9df13ac8defba2678bd78a5239a0ee
+  Author: Fixture Author <fixture@example.invalid>
+  Date:   Mon Sep 28 10:00:00 2026 +0000
+  Maintain unrelated component 27
+  [+136 lines omitted]

@@ -1,0 +1,32 @@
+{
+  "caseId": "search-negative",
+  "arm": "rtk",
+  "repeat": 1,
+  "textChars": 11290,
+  "answer": "Cannot be determined from the captured output — the search only covers issuer URLs, no timeout value appears. Retrieval needed.",
+  "evidence": [
+    "production/config.ts: issuer = https://issuer.pearl-46.example/v2",
+    "deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer"
+  ],
+  "needMore": true,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1683.579374999994,
+  "usage": {
+    "input": 28,
+    "output": 78,
+    "cacheRead": 2944,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3050,
+    "cost": {
+      "input": 0.0000042,
+      "output": 0.000039,
+      "cacheRead": 0.00008832,
+      "cacheWrite": 0,
+      "total": 0.00013152
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

@@ -1,0 +1,32 @@
+{
+  "caseId": "search-override",
+  "arm": "raw",
+  "repeat": 1,
+  "textChars": 11290,
+  "answer": "The production config sets issuer = https://issuer.pearl-46.example/v2, but deploy/runtime.env defines AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1, which overrides the production issuer, so the deployment still points to the legacy issuer.",
+  "evidence": [
+    "AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer",
+    "production/config.ts: issuer = https://issuer.pearl-46.example/v2"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1511.076374999997,
+  "usage": {
+    "input": 27,
+    "output": 105,
+    "cacheRead": 2944,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3076,
+    "cost": {
+      "input": 0.00000405,
+      "output": 0.000052499999999999995,
+      "cacheRead": 0.00008832,
+      "cacheWrite": 0,
+      "total": 0.00014487
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

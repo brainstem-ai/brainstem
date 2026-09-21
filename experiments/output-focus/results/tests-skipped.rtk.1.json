@@ -1,0 +1,64 @@
+{
+  "caseId": "tests-skipped",
+  "arm": "rtk",
+  "repeat": 1,
+  "textChars": 174,
+  "answer": "Insufficient evidence: the output shows two failing tests but no skipped test, so no authorization test skip can be identified.",
+  "evidence": [
+    "FAIL  pilot.test.ts > authentication response uses the expected relay header",
+    "FAIL  pilot.test.ts > unrelated invoice rounds correctly"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 2549.4667919999993,
+  "usage": {
+    "input": 215,
+    "output": 66,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 4,
+    "totalTokens": 281,
+    "cost": {
+      "input": 0.00003225,
+      "output": 0.000032999999999999996,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00006524999999999999
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "tests-skipped",
+    "arm": "rtk",
+    "repeat": 1,
+    "textChars": 4588,
+    "answer": "expired service token rejects marker violet-83",
+    "evidence": [
+      "↓ pilot.test.ts > expired service token rejects marker violet-83",
+      "test.skip('expired service token rejects marker violet-83'"
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 1506.4760000000006,
+    "usage": {
+      "input": 13,
+      "output": 49,
+      "cacheRead": 1600,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 1662,
+      "cost": {
+        "input": 0.00000195,
+        "output": 0.0000245,
+        "cacheRead": 0.000047999999999999994,
+        "cacheWrite": 0,
+        "total": 0.00007445
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

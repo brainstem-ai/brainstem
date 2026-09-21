@@ -1,5 +1,7 @@
 # Brainstem — Dual-Brain Agent Harness Implementation Plan
 
+> Historical implementation record. The current proposed direction, including capability bitmaps and the evaluated Jev output-focus feature, is in [the consolidated harness evolution plan](2026-09-20-harness-evolution.md).
+
 **Goal:** A minimal coding-agent harness where Jev (TypeSafe's System One model) owns every non-generative decision in the loop — gate, sanitize, steer, tend, pulse, verify — and the LLM is a pure generator.
 
 **Architecture:** A standalone **reflex engine library** (`packages/core`: question tables + policy + journal, zero harness deps) consumed by a thin CLI built on `@earendil-works/pi-agent-core`, whose hooks (`beforeToolCall`, `afterToolCall`, `transformContext`, `shouldStopAfterTurn`, `subscribe`) are exactly the reflex insertion points. The same core can later power a proxy shell for existing harnesses ("Supervisor") and a workflow-runtime shell ("Inverted Harness").

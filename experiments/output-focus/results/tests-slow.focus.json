@@ -1,0 +1,79 @@
+{
+  "caseId": "tests-slow",
+  "catalogHash": "166c698f55b791df77d748946d73f4f68d8cc9a9daf31dada3877f5eedc9e7a4",
+  "sections": [
+    {
+      "id": "s0",
+      "start": 0,
+      "end": 613,
+      "text": "\n RUN  v3.2.7 /private<fixture>\n\n ✓ pilot.test.ts > unrelated fixture 0 keeps sample-0 1ms\n ✓ pilot.test.ts > unrelated fixture 1 keeps sample-1 0ms\n ✓ pilot.test.ts > unrelated fixture 2 keeps sample-2 0ms\n ✓ pilot.test.ts > unrelated fixture 3 keeps sample-3 0ms\n ✓ pilot.test.ts > unrelated fixture 4 keeps sample-4 0ms\n ✓ pilot.test.ts > unrelated fixture 5 keeps sample-5 0ms\n ✓ pilot.test.ts > unrelated fixture 6 keeps sample-6 0ms\n ✓ pilot.test.ts > unrelated fixture 7 keeps sample-7 0ms\n ✓ pilot.test.ts > unrelated fixture 8 keeps sample-8 0ms\n ✓ pilot.test.ts > unrelated fixture 9 keeps sample-9 0ms\n"
+    },
+    {
+      "id": "s1",
+      "start": 613,
+      "end": 1213,
+      "text": " ✓ pilot.test.ts > unrelated fixture 10 keeps sample-10 0ms\n ✓ pilot.test.ts > unrelated fixture 11 keeps sample-11 0ms\n ✓ pilot.test.ts > unrelated fixture 12 keeps sample-12 0ms\n ✓ pilot.test.ts > unrelated fixture 13 keeps sample-13 0ms\n ✓ pilot.test.ts > unrelated fixture 14 keeps sample-14 0ms\n ✓ pilot.test.ts > unrelated fixture 15 keeps sample-15 0ms\n ✓ pilot.test.ts > unrelated fixture 16 keeps sample-16 0ms\n ✓ pilot.test.ts > unrelated fixture 17 keeps sample-17 0ms\n ✓ pilot.test.ts > unrelated fixture 18 keeps sample-18 0ms\n ✓ pilot.test.ts > unrelated fixture 19 keeps sample-19 0ms\n"
+    },
+    {
+      "id": "s2",
+      "start": 1213,
+      "end": 1813,
+      "text": " ✓ pilot.test.ts > unrelated fixture 20 keeps sample-20 0ms\n ✓ pilot.test.ts > unrelated fixture 21 keeps sample-21 0ms\n ✓ pilot.test.ts > unrelated fixture 22 keeps sample-22 0ms\n ✓ pilot.test.ts > unrelated fixture 23 keeps sample-23 0ms\n ✓ pilot.test.ts > unrelated fixture 24 keeps sample-24 0ms\n ✓ pilot.test.ts > unrelated fixture 25 keeps sample-25 0ms\n ✓ pilot.test.ts > unrelated fixture 26 keeps sample-26 0ms\n ✓ pilot.test.ts > unrelated fixture 27 keeps sample-27 0ms\n ✓ pilot.test.ts > unrelated fixture 28 keeps sample-28 0ms\n ✓ pilot.test.ts > unrelated fixture 29 keeps sample-29 0ms\n"
+    },
+    {
+      "id": "s3",
+      "start": 1813,
+      "end": 2413,
+      "text": " ✓ pilot.test.ts > unrelated fixture 30 keeps sample-30 0ms\n ✓ pilot.test.ts > unrelated fixture 31 keeps sample-31 0ms\n ✓ pilot.test.ts > unrelated fixture 32 keeps sample-32 0ms\n ✓ pilot.test.ts > unrelated fixture 33 keeps sample-33 0ms\n ✓ pilot.test.ts > unrelated fixture 34 keeps sample-34 0ms\n ✓ pilot.test.ts > unrelated fixture 35 keeps sample-35 0ms\n ✓ pilot.test.ts > unrelated fixture 36 keeps sample-36 0ms\n ✓ pilot.test.ts > unrelated fixture 37 keeps sample-37 0ms\n ✓ pilot.test.ts > unrelated fixture 38 keeps sample-38 0ms\n ✓ pilot.test.ts > unrelated fixture 39 keeps sample-39 0ms\n"
+    },
+    {
+      "id": "s4",
+      "start": 2413,
+      "end": 3058,
+      "text": " ✓ pilot.test.ts > unrelated fixture 40 keeps sample-40 0ms\n ✓ pilot.test.ts > unrelated fixture 41 keeps sample-41 0ms\n ✓ pilot.test.ts > unrelated fixture 42 keeps sample-42 0ms\n ✓ pilot.test.ts > unrelated fixture 43 keeps sample-43 0ms\n ✓ pilot.test.ts > unrelated fixture 44 keeps sample-44 0ms\n ✓ pilot.test.ts > archive export retains marker quartz-71 352ms\n ↓ pilot.test.ts > expired service token rejects marker violet-83\n × pilot.test.ts > authentication response uses the expected relay header 12ms\n   → expected 'relay-cobalt-17' to be 'relay-amber-42' // Object.is equality\n × pilot.test.ts > unrelated invoice rounds correctly 2ms\n"
+    },
+    {
+      "id": "s5",
+      "start": 3058,
+      "end": 3676,
+      "text": "   → expected 4.17 to be 4.18 // Object.is equality\n\n Test Files  1 failed (1)\n      Tests  2 failed | 46 passed | 1 skipped (49)\n   Start at  19:52:35\n   Duration  641ms (transform 18ms, setup 0ms, collect 14ms, tests 369ms, environment 0ms, prepare 39ms)\n\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  pilot.test.ts > authentication response uses the expected relay header\nAssertionError: expected 'relay-cobalt-17' to be 'relay-amber-42' // Object.is equality\n\nExpected: \"relay-amber-42\"\nReceived: \"relay-cobalt-17\"\n\n ❯ pilot.test.ts:49:96\n     47| test('archive export retains marker quartz-71', async () => { await ne…\n"
+    },
+    {
+      "id": "s6",
+      "start": 3676,
+      "end": 4320,
+      "text": "     48| test.skip('expired service token rejects marker violet-83', () => {});\n     49| test('authentication response uses the expected relay header', () => e…\n       |                                                                                                ^\n     50| test('unrelated invoice rounds correctly', () => expect(4.17).toBe(4.1…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  pilot.test.ts > unrelated invoice rounds correctly\nAssertionError: expected 4.17 to be 4.18 // Object.is equality\n\n- Expected\n+ Received\n\n- 4.18\n+ 4.17\n\n ❯ pilot.test.ts:50:63\n     48| test.skip('expired service token rejects marker violet-83', () => {});\n"
+    },
+    {
+      "id": "s7",
+      "start": 4320,
+      "end": 4588,
+      "text": "     49| test('authentication response uses the expected relay header', () => e…\n     50| test('unrelated invoice rounds correctly', () => expect(4.17).toBe(4.1…\n       |                                                               ^\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n"
+    }
+  ],
+  "scores": {
+    "s0": 0.65,
+    "s1": 0.51,
+    "s2": 0.43,
+    "s3": 0.46,
+    "s4": 0.94,
+    "s5": 0.42,
+    "s6": 0.26,
+    "s7": 0.27
+  },
+  "selected": [
+    "s0",
+    "s4"
+  ],
+  "bitmapBase64": "EQ==",
+  "bitLength": 8,
+  "text": "[source lines/offset 0..613]\n\n RUN  v3.2.7 /private<fixture>\n\n ✓ pilot.test.ts > unrelated fixture 0 keeps sample-0 1ms\n ✓ pilot.test.ts > unrelated fixture 1 keeps sample-1 0ms\n ✓ pilot.test.ts > unrelated fixture 2 keeps sample-2 0ms\n ✓ pilot.test.ts > unrelated fixture 3 keeps sample-3 0ms\n ✓ pilot.test.ts > unrelated fixture 4 keeps sample-4 0ms\n ✓ pilot.test.ts > unrelated fixture 5 keeps sample-5 0ms\n ✓ pilot.test.ts > unrelated fixture 6 keeps sample-6 0ms\n ✓ pilot.test.ts > unrelated fixture 7 keeps sample-7 0ms\n ✓ pilot.test.ts > unrelated fixture 8 keeps sample-8 0ms\n ✓ pilot.test.ts > unrelated fixture 9 keeps sample-9 0ms\n\n[... omitted sections ...]\n[source lines/offset 2413..3058]\n ✓ pilot.test.ts > unrelated fixture 40 keeps sample-40 0ms\n ✓ pilot.test.ts > unrelated fixture 41 keeps sample-41 0ms\n ✓ pilot.test.ts > unrelated fixture 42 keeps sample-42 0ms\n ✓ pilot.test.ts > unrelated fixture 43 keeps sample-43 0ms\n ✓ pilot.test.ts > unrelated fixture 44 keeps sample-44 0ms\n ✓ pilot.test.ts > archive export retains marker quartz-71 352ms\n ↓ pilot.test.ts > expired service token rejects marker violet-83\n × pilot.test.ts > authentication response uses the expected relay header 12ms\n   → expected 'relay-cobalt-17' to be 'relay-amber-42' // Object.is equality\n × pilot.test.ts > unrelated invoice rounds correctly 2ms\n",
+  "budgetChars": 1835,
+  "latencyMs": 365.742708,
+  "usage": {
+    "input_tokens": 2902,
+    "output_tokens": 140
+  },
+  "model": "jev-1.13.0",
+  "status": "ok"
+}

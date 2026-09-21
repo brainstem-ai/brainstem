@@ -1,0 +1,156 @@
+{
+  "caseId": "search-auth",
+  "catalogHash": "ab419fec35c2d105a2bc3069f7ca37d9e4ce0e60cfdf6ba8cb1d2d54d8222021",
+  "sections": [
+    {
+      "id": "s0",
+      "start": 0,
+      "end": 588,
+      "text": "1:archived-0: issuer = https://fixture-0.example.invalid; this value is a historical test fixture\n2:archived-1: issuer = https://fixture-1.example.invalid; this value is a historical test fixture\n3:archived-2: issuer = https://fixture-2.example.invalid; this value is a historical test fixture\n4:archived-3: issuer = https://fixture-3.example.invalid; this value is a historical test fixture\n5:archived-4: issuer = https://fixture-4.example.invalid; this value is a historical test fixture\n6:archived-5: issuer = https://fixture-5.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s1",
+      "start": 588,
+      "end": 1183,
+      "text": "7:archived-6: issuer = https://fixture-6.example.invalid; this value is a historical test fixture\n8:archived-7: issuer = https://fixture-7.example.invalid; this value is a historical test fixture\n9:archived-8: issuer = https://fixture-8.example.invalid; this value is a historical test fixture\n10:archived-9: issuer = https://fixture-9.example.invalid; this value is a historical test fixture\n11:archived-10: issuer = https://fixture-10.example.invalid; this value is a historical test fixture\n12:archived-11: issuer = https://fixture-11.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s2",
+      "start": 1183,
+      "end": 1789,
+      "text": "13:archived-12: issuer = https://fixture-12.example.invalid; this value is a historical test fixture\n14:archived-13: issuer = https://fixture-13.example.invalid; this value is a historical test fixture\n15:archived-14: issuer = https://fixture-14.example.invalid; this value is a historical test fixture\n16:archived-15: issuer = https://fixture-15.example.invalid; this value is a historical test fixture\n17:archived-16: issuer = https://fixture-16.example.invalid; this value is a historical test fixture\n18:archived-17: issuer = https://fixture-17.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s3",
+      "start": 1789,
+      "end": 2395,
+      "text": "19:archived-18: issuer = https://fixture-18.example.invalid; this value is a historical test fixture\n20:archived-19: issuer = https://fixture-19.example.invalid; this value is a historical test fixture\n21:archived-20: issuer = https://fixture-20.example.invalid; this value is a historical test fixture\n22:archived-21: issuer = https://fixture-21.example.invalid; this value is a historical test fixture\n23:archived-22: issuer = https://fixture-22.example.invalid; this value is a historical test fixture\n24:archived-23: issuer = https://fixture-23.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s4",
+      "start": 2395,
+      "end": 2969,
+      "text": "25:production/config.ts: issuer = https://issuer.pearl-46.example/v2\n26:archived-24: issuer = https://fixture-24.example.invalid; this value is a historical test fixture\n27:archived-25: issuer = https://fixture-25.example.invalid; this value is a historical test fixture\n28:archived-26: issuer = https://fixture-26.example.invalid; this value is a historical test fixture\n29:archived-27: issuer = https://fixture-27.example.invalid; this value is a historical test fixture\n30:archived-28: issuer = https://fixture-28.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s5",
+      "start": 2969,
+      "end": 3575,
+      "text": "31:archived-29: issuer = https://fixture-29.example.invalid; this value is a historical test fixture\n32:archived-30: issuer = https://fixture-30.example.invalid; this value is a historical test fixture\n33:archived-31: issuer = https://fixture-31.example.invalid; this value is a historical test fixture\n34:archived-32: issuer = https://fixture-32.example.invalid; this value is a historical test fixture\n35:archived-33: issuer = https://fixture-33.example.invalid; this value is a historical test fixture\n36:archived-34: issuer = https://fixture-34.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s6",
+      "start": 3575,
+      "end": 4181,
+      "text": "37:archived-35: issuer = https://fixture-35.example.invalid; this value is a historical test fixture\n38:archived-36: issuer = https://fixture-36.example.invalid; this value is a historical test fixture\n39:archived-37: issuer = https://fixture-37.example.invalid; this value is a historical test fixture\n40:archived-38: issuer = https://fixture-38.example.invalid; this value is a historical test fixture\n41:archived-39: issuer = https://fixture-39.example.invalid; this value is a historical test fixture\n42:archived-40: issuer = https://fixture-40.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s7",
+      "start": 4181,
+      "end": 4787,
+      "text": "43:archived-41: issuer = https://fixture-41.example.invalid; this value is a historical test fixture\n44:archived-42: issuer = https://fixture-42.example.invalid; this value is a historical test fixture\n45:archived-43: issuer = https://fixture-43.example.invalid; this value is a historical test fixture\n46:archived-44: issuer = https://fixture-44.example.invalid; this value is a historical test fixture\n47:archived-45: issuer = https://fixture-45.example.invalid; this value is a historical test fixture\n48:archived-46: issuer = https://fixture-46.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s8",
+      "start": 4787,
+      "end": 5393,
+      "text": "49:archived-47: issuer = https://fixture-47.example.invalid; this value is a historical test fixture\n50:archived-48: issuer = https://fixture-48.example.invalid; this value is a historical test fixture\n51:archived-49: issuer = https://fixture-49.example.invalid; this value is a historical test fixture\n52:archived-50: issuer = https://fixture-50.example.invalid; this value is a historical test fixture\n53:archived-51: issuer = https://fixture-51.example.invalid; this value is a historical test fixture\n54:archived-52: issuer = https://fixture-52.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s9",
+      "start": 5393,
+      "end": 5999,
+      "text": "55:archived-53: issuer = https://fixture-53.example.invalid; this value is a historical test fixture\n56:archived-54: issuer = https://fixture-54.example.invalid; this value is a historical test fixture\n57:archived-55: issuer = https://fixture-55.example.invalid; this value is a historical test fixture\n58:archived-56: issuer = https://fixture-56.example.invalid; this value is a historical test fixture\n59:archived-57: issuer = https://fixture-57.example.invalid; this value is a historical test fixture\n60:archived-58: issuer = https://fixture-58.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s10",
+      "start": 5999,
+      "end": 6605,
+      "text": "61:archived-59: issuer = https://fixture-59.example.invalid; this value is a historical test fixture\n62:archived-60: issuer = https://fixture-60.example.invalid; this value is a historical test fixture\n63:archived-61: issuer = https://fixture-61.example.invalid; this value is a historical test fixture\n64:archived-62: issuer = https://fixture-62.example.invalid; this value is a historical test fixture\n65:archived-63: issuer = https://fixture-63.example.invalid; this value is a historical test fixture\n66:archived-64: issuer = https://fixture-64.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s11",
+      "start": 6605,
+      "end": 7211,
+      "text": "67:archived-65: issuer = https://fixture-65.example.invalid; this value is a historical test fixture\n68:archived-66: issuer = https://fixture-66.example.invalid; this value is a historical test fixture\n69:archived-67: issuer = https://fixture-67.example.invalid; this value is a historical test fixture\n70:archived-68: issuer = https://fixture-68.example.invalid; this value is a historical test fixture\n71:archived-69: issuer = https://fixture-69.example.invalid; this value is a historical test fixture\n72:archived-70: issuer = https://fixture-70.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s12",
+      "start": 7211,
+      "end": 7817,
+      "text": "73:archived-71: issuer = https://fixture-71.example.invalid; this value is a historical test fixture\n74:archived-72: issuer = https://fixture-72.example.invalid; this value is a historical test fixture\n75:archived-73: issuer = https://fixture-73.example.invalid; this value is a historical test fixture\n76:archived-74: issuer = https://fixture-74.example.invalid; this value is a historical test fixture\n77:archived-75: issuer = https://fixture-75.example.invalid; this value is a historical test fixture\n78:archived-76: issuer = https://fixture-76.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s13",
+      "start": 7817,
+      "end": 8429,
+      "text": "79:archived-77: issuer = https://fixture-77.example.invalid; this value is a historical test fixture\n80:archived-78: issuer = https://fixture-78.example.invalid; this value is a historical test fixture\n81:archived-79: issuer = https://fixture-79.example.invalid; this value is a historical test fixture\n82:deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer\n83:archived-80: issuer = https://fixture-80.example.invalid; this value is a historical test fixture\n84:archived-81: issuer = https://fixture-81.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s14",
+      "start": 8429,
+      "end": 9035,
+      "text": "85:archived-82: issuer = https://fixture-82.example.invalid; this value is a historical test fixture\n86:archived-83: issuer = https://fixture-83.example.invalid; this value is a historical test fixture\n87:archived-84: issuer = https://fixture-84.example.invalid; this value is a historical test fixture\n88:archived-85: issuer = https://fixture-85.example.invalid; this value is a historical test fixture\n89:archived-86: issuer = https://fixture-86.example.invalid; this value is a historical test fixture\n90:archived-87: issuer = https://fixture-87.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s15",
+      "start": 9035,
+      "end": 9641,
+      "text": "91:archived-88: issuer = https://fixture-88.example.invalid; this value is a historical test fixture\n92:archived-89: issuer = https://fixture-89.example.invalid; this value is a historical test fixture\n93:archived-90: issuer = https://fixture-90.example.invalid; this value is a historical test fixture\n94:archived-91: issuer = https://fixture-91.example.invalid; this value is a historical test fixture\n95:archived-92: issuer = https://fixture-92.example.invalid; this value is a historical test fixture\n96:archived-93: issuer = https://fixture-93.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s16",
+      "start": 9641,
+      "end": 10250,
+      "text": "97:archived-94: issuer = https://fixture-94.example.invalid; this value is a historical test fixture\n98:archived-95: issuer = https://fixture-95.example.invalid; this value is a historical test fixture\n99:archived-96: issuer = https://fixture-96.example.invalid; this value is a historical test fixture\n100:archived-97: issuer = https://fixture-97.example.invalid; this value is a historical test fixture\n101:archived-98: issuer = https://fixture-98.example.invalid; this value is a historical test fixture\n102:archived-99: issuer = https://fixture-99.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s17",
+      "start": 10250,
+      "end": 10874,
+      "text": "103:archived-100: issuer = https://fixture-100.example.invalid; this value is a historical test fixture\n104:archived-101: issuer = https://fixture-101.example.invalid; this value is a historical test fixture\n105:archived-102: issuer = https://fixture-102.example.invalid; this value is a historical test fixture\n106:archived-103: issuer = https://fixture-103.example.invalid; this value is a historical test fixture\n107:archived-104: issuer = https://fixture-104.example.invalid; this value is a historical test fixture\n108:archived-105: issuer = https://fixture-105.example.invalid; this value is a historical test fixture\n"
+    },
+    {
+      "id": "s18",
+      "start": 10874,
+      "end": 11290,
+      "text": "109:archived-106: issuer = https://fixture-106.example.invalid; this value is a historical test fixture\n110:archived-107: issuer = https://fixture-107.example.invalid; this value is a historical test fixture\n111:archived-108: issuer = https://fixture-108.example.invalid; this value is a historical test fixture\n112:archived-109: issuer = https://fixture-109.example.invalid; this value is a historical test fixture\n"
+    }
+  ],
+  "scores": {
+    "s0": 0.41,
+    "s1": 0.12,
+    "s2": 0.11,
+    "s3": 0.11,
+    "s4": 0.95,
+    "s5": 0.09,
+    "s6": 0.08,
+    "s7": 0.07,
+    "s8": 0.07,
+    "s9": 0.08,
+    "s10": 0.08,
+    "s11": 0.07,
+    "s12": 0.09,
+    "s13": 0.78,
+    "s14": 0.17,
+    "s15": 0.07,
+    "s16": 0.07,
+    "s17": 0.07,
+    "s18": 0.07
+  },
+  "selected": [
+    "s4",
+    "s13"
+  ],
+  "bitmapBase64": "ECAA",
+  "bitLength": 19,
+  "text": "[source lines/offset 2395..2969]\n25:production/config.ts: issuer = https://issuer.pearl-46.example/v2\n26:archived-24: issuer = https://fixture-24.example.invalid; this value is a historical test fixture\n27:archived-25: issuer = https://fixture-25.example.invalid; this value is a historical test fixture\n28:archived-26: issuer = https://fixture-26.example.invalid; this value is a historical test fixture\n29:archived-27: issuer = https://fixture-27.example.invalid; this value is a historical test fixture\n30:archived-28: issuer = https://fixture-28.example.invalid; this value is a historical test fixture\n\n[... omitted sections ...]\n[source lines/offset 7817..8429]\n79:archived-77: issuer = https://fixture-77.example.invalid; this value is a historical test fixture\n80:archived-78: issuer = https://fixture-78.example.invalid; this value is a historical test fixture\n81:archived-79: issuer = https://fixture-79.example.invalid; this value is a historical test fixture\n82:deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer\n83:archived-80: issuer = https://fixture-80.example.invalid; this value is a historical test fixture\n84:archived-81: issuer = https://fixture-81.example.invalid; this value is a historical test fixture\n",
+  "budgetChars": 4516,
+  "latencyMs": 173.37654199999997,
+  "usage": {
+    "input_tokens": 5833,
+    "output_tokens": 336
+  },
+  "model": "jev-1.13.0",
+  "status": "ok"
+}

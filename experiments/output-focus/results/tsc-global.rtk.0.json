@@ -1,0 +1,34 @@
+{
+  "caseId": "tsc-global",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 2981,
+  "answer": "25 distinct source files have compiler diagnostics (authorization.ts, billing.ts, and noise-00 through noise-23).",
+  "evidence": [
+    "compiler/authorization.ts(1,14)",
+    "compiler/billing.ts(2,35)",
+    "compiler/noise-00.ts(1,14)",
+    "compiler/noise-23.ts(1,14)"
+  ],
+  "needMore": false,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 2127.9766249999993,
+  "usage": {
+    "input": 1033,
+    "output": 94,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 16,
+    "totalTokens": 1127,
+    "cost": {
+      "input": 0.00015495,
+      "output": 0.000047,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00020195
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

@@ -1,0 +1,66 @@
+{
+  "caseId": "tsc-global",
+  "arm": "jev",
+  "repeat": 0,
+  "textChars": 1193,
+  "answer": "Cannot determine exact count from the truncated output: files before noise-02 and after noise-11 are omitted, so the total number of distinct files is not visible.",
+  "evidence": [
+    "noise-02.ts(1,14): error TS2322",
+    "noise-11.ts(1,14): error TS2322",
+    "[... omitted sections ...]"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 3372.892832999998,
+  "usage": {
+    "input": 521,
+    "output": 109,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 28,
+    "totalTokens": 630,
+    "cost": {
+      "input": 0.00007815,
+      "output": 0.000054499999999999997,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00013265
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "tsc-global",
+    "arm": "jev",
+    "repeat": 0,
+    "textChars": 2981,
+    "answer": "22 distinct source files have compiler diagnostics (authorization.ts, billing.ts, and noise-00 through noise-19).",
+    "evidence": [
+      "compiler/authorization.ts(1,14)",
+      "compiler/billing.ts(2,35)",
+      "compiler/noise-19.ts(1,14)"
+    ],
+    "needMore": true,
+    "correct": false,
+    "grounded": true,
+    "latencyMs": 1938.5379580000008,
+    "usage": {
+      "input": 1028,
+      "output": 67,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 1095,
+      "cost": {
+        "input": 0.00015419999999999998,
+        "output": 0.0000335,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00018769999999999998
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

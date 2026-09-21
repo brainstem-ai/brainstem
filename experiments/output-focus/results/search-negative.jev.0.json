@@ -1,0 +1,31 @@
+{
+  "caseId": "search-negative",
+  "arm": "jev",
+  "repeat": 0,
+  "textChars": 57,
+  "answer": "The captured output contains no matching lines, so the production issuer timeout in milliseconds cannot be established. Please retrieve the search/inventory.txt artifact (or sections showing the production issuer timeout configuration).",
+  "evidence": [
+    "[No sections selected; additional evidence is available.]"
+  ],
+  "needMore": true,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 2719.1813330000004,
+  "usage": {
+    "input": 188,
+    "output": 76,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 14,
+    "totalTokens": 264,
+    "cost": {
+      "input": 0.000028199999999999998,
+      "output": 0.000037999999999999995,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0000662
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

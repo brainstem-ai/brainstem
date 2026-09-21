@@ -1,0 +1,31 @@
+{
+  "caseId": "git-subject",
+  "arm": "raw",
+  "repeat": 1,
+  "textChars": 7771,
+  "answer": "Correct retry jitter [OPS-739]",
+  "evidence": [
+    "Correct retry jitter [OPS-739]"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1342.7176249999975,
+  "usage": {
+    "input": 24,
+    "output": 33,
+    "cacheRead": 2432,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 2489,
+    "cost": {
+      "input": 0.0000036,
+      "output": 0.000016499999999999998,
+      "cacheRead": 0.00007295999999999999,
+      "cacheWrite": 0,
+      "total": 0.00009306
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

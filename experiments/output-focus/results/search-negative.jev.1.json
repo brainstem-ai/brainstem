@@ -1,0 +1,31 @@
+{
+  "caseId": "search-negative",
+  "arm": "jev",
+  "repeat": 1,
+  "textChars": 57,
+  "answer": "The captured search output contains no evidence of the production issuer timeout; please retrieve additional evidence.",
+  "evidence": [
+    "[No sections selected; additional evidence is available.]"
+  ],
+  "needMore": true,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1201.380207999995,
+  "usage": {
+    "input": 188,
+    "output": 42,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 230,
+    "cost": {
+      "input": 0.000028199999999999998,
+      "output": 0.000021,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.000049199999999999997
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

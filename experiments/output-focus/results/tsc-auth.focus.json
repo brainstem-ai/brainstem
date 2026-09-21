@@ -1,0 +1,64 @@
+{
+  "caseId": "tsc-auth",
+  "catalogHash": "65345c9856abef577eff048fd504e1fe284e90e8fa747994bd239da1807dc4c4",
+  "sections": [
+    {
+      "id": "s0",
+      "start": 0,
+      "end": 561,
+      "text": "../../..<fixture>/compiler/authorization.ts(1,14): error TS2322: Type '\"legacy-orchid-29\"' is not assignable to type '\"signed-jade-64\"'.\n../../..<fixture>/compiler/billing.ts(2,35): error TS2561: Object literal may only specify known properties, but 'settlemantCode' does not exist in type 'Billing'. Did you mean to write 'settlementCode'?\n../../..<fixture>/compiler/noise-00.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-01.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    },
+    {
+      "id": "s1",
+      "start": 561,
+      "end": 1111,
+      "text": "../../..<fixture>/compiler/noise-02.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-03.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-04.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-05.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-06.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    },
+    {
+      "id": "s2",
+      "start": 1111,
+      "end": 1661,
+      "text": "../../..<fixture>/compiler/noise-07.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-08.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-09.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-10.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-11.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    },
+    {
+      "id": "s3",
+      "start": 1661,
+      "end": 2211,
+      "text": "../../..<fixture>/compiler/noise-12.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-13.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-14.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-15.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-16.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    },
+    {
+      "id": "s4",
+      "start": 2211,
+      "end": 2761,
+      "text": "../../..<fixture>/compiler/noise-17.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-18.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-19.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-20.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-21.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    },
+    {
+      "id": "s5",
+      "start": 2761,
+      "end": 2981,
+      "text": "../../..<fixture>/compiler/noise-22.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-23.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    }
+  ],
+  "scores": {
+    "s0": 0.94,
+    "s1": 0.21,
+    "s2": 0.16,
+    "s3": 0.15,
+    "s4": 0.13,
+    "s5": 0.15
+  },
+  "selected": [
+    "s0"
+  ],
+  "bitmapBase64": "AQ==",
+  "bitLength": 6,
+  "text": "[source lines/offset 0..561]\n../../..<fixture>/compiler/authorization.ts(1,14): error TS2322: Type '\"legacy-orchid-29\"' is not assignable to type '\"signed-jade-64\"'.\n../../..<fixture>/compiler/billing.ts(2,35): error TS2561: Object literal may only specify known properties, but 'settlemantCode' does not exist in type 'Billing'. Did you mean to write 'settlementCode'?\n../../..<fixture>/compiler/noise-00.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n../../..<fixture>/compiler/noise-01.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n",
+  "budgetChars": 1192,
+  "latencyMs": 175.88808299999994,
+  "usage": {
+    "input_tokens": 2100,
+    "output_tokens": 106
+  },
+  "model": "jev-1.13.0",
+  "status": "ok"
+}

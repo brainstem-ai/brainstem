@@ -1,0 +1,31 @@
+{
+  "caseId": "search-auth",
+  "arm": "jev",
+  "repeat": 0,
+  "textChars": 1280,
+  "answer": "https://issuer.pearl-46.example/v2",
+  "evidence": [
+    "production/config.ts: issuer = https://issuer.pearl-46.example/v2"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1499.2380840000042,
+  "usage": {
+    "input": 500,
+    "output": 43,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 543,
+    "cost": {
+      "input": 0.000075,
+      "output": 0.000021499999999999997,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00009649999999999999
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

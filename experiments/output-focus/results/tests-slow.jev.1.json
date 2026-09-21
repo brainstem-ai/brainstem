@@ -1,0 +1,31 @@
+{
+  "caseId": "tests-slow",
+  "arm": "jev",
+  "repeat": 1,
+  "textChars": 1348,
+  "answer": "pilot.test.ts > archive export retains marker quartz-71",
+  "evidence": [
+    "archive export retains marker quartz-71 352ms"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1849.6695,
+  "usage": {
+    "input": 554,
+    "output": 38,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 592,
+    "cost": {
+      "input": 0.0000831,
+      "output": 0.000018999999999999998,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0001021
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

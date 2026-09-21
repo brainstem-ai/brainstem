@@ -1,0 +1,113 @@
+{
+  "caseId": "git-migration",
+  "catalogHash": "833aee7784fda37bd51418b80aa7acd80e48ba48c7ac3672713bd9211ddfe3dc",
+  "sections": [
+    {
+      "id": "s0",
+      "start": 0,
+      "end": 604,
+      "text": "commit 633ca8b0bf9df13ac8defba2678bd78a5239a0ee\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Mon Sep 28 10:00:00 2026 +0000\n\n    Maintain unrelated component 27\n    \n    Routine fixture note 27: refresh unrelated sample metadata without changing external behavior.\n\ncommit 60c07b7aac169b0076627cf0d1affcc06fb90386\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sun Sep 27 10:00:00 2026 +0000\n\n    Maintain unrelated component 26\n    \n    Routine fixture note 26: refresh unrelated sample metadata without changing external behavior.\n\ncommit 80cbf76838c8ac8cbeabefe282499f768a76ffab\n"
+    },
+    {
+      "id": "s1",
+      "start": 604,
+      "end": 1248,
+      "text": "Author: Fixture Author <fixture@example.invalid>\nDate:   Sat Sep 26 10:00:00 2026 +0000\n\n    Maintain unrelated component 25\n    \n    Routine fixture note 25: refresh unrelated sample metadata without changing external behavior.\n\ncommit f4419a2aaef580d94e3aff53fa6d8f3fc6c1f78b\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Fri Sep 25 10:00:00 2026 +0000\n\n    Correct retry jitter [OPS-739]\n    \n    Routine fixture note 24: refresh unrelated sample metadata without changing external behavior.\n\ncommit e006d887f1f293a98ccc880ff5b9165c4423ce17\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Thu Sep 24 10:00:00 2026 +0000\n\n"
+    },
+    {
+      "id": "s2",
+      "start": 1248,
+      "end": 1845,
+      "text": "    Maintain unrelated component 23\n    \n    Routine fixture note 23: refresh unrelated sample metadata without changing external behavior.\n\ncommit b54c82ce9694ab2b9515168227460589294e8eff\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Wed Sep 23 10:00:00 2026 +0000\n\n    Maintain unrelated component 22\n    \n    Routine fixture note 22: refresh unrelated sample metadata without changing external behavior.\n\ncommit 13d2b160c02c209adc1b8ad5225ef80ebf830b0e\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Tue Sep 22 10:00:00 2026 +0000\n\n    Maintain unrelated component 21\n    \n"
+    },
+    {
+      "id": "s3",
+      "start": 1845,
+      "end": 2401,
+      "text": "    Routine fixture note 21: refresh unrelated sample metadata without changing external behavior.\n\ncommit 681b23599f3d21b3139408dd32033330941e90d4\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Mon Sep 21 10:00:00 2026 +0000\n\n    Maintain unrelated component 20\n    \n    Routine fixture note 20: refresh unrelated sample metadata without changing external behavior.\n\ncommit 44a1a939a497b78ef9378b72a7ae5ffbb8fb9a33\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sun Sep 20 10:00:00 2026 +0000\n\n    Maintain unrelated component 19\n    \n"
+    },
+    {
+      "id": "s4",
+      "start": 2401,
+      "end": 3041,
+      "text": "    Routine fixture note 19: refresh unrelated sample metadata without changing external behavior.\n\ncommit 79a8fe14676c13492969a371b838f7fc66bba39b\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sat Sep 19 10:00:00 2026 +0000\n\n    Stage invoice migration\n    \n    Rollout requires MIGRATE_SILVER_52=enabled. Rollback command: db undo --tag silver-52.\n\ncommit ed1bd6e8ec89bb69a99738b011f0b06a98339a4e\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Fri Sep 18 10:00:00 2026 +0000\n\n    Maintain unrelated component 17\n    \n    Routine fixture note 17: refresh unrelated sample metadata without changing external behavior.\n\n"
+    },
+    {
+      "id": "s5",
+      "start": 3041,
+      "end": 3645,
+      "text": "commit fadf18f01b62c7da91215d0b133c5b518507d0d8\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Thu Sep 17 10:00:00 2026 +0000\n\n    Maintain unrelated component 16\n    \n    Routine fixture note 16: refresh unrelated sample metadata without changing external behavior.\n\ncommit 13c51f9f24d205d2a699eb8bcf1b5a322ca942b4\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Wed Sep 16 10:00:00 2026 +0000\n\n    Maintain unrelated component 15\n    \n    Routine fixture note 15: refresh unrelated sample metadata without changing external behavior.\n\ncommit 59260c04618aff451f98ec7b4248e69abe725839\n"
+    },
+    {
+      "id": "s6",
+      "start": 3645,
+      "end": 4290,
+      "text": "Author: Fixture Author <fixture@example.invalid>\nDate:   Tue Sep 15 10:00:00 2026 +0000\n\n    Maintain unrelated component 14\n    \n    Routine fixture note 14: refresh unrelated sample metadata without changing external behavior.\n\ncommit a4a38c379baf70ec4b144af90bf599ba4d7db6ed\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Mon Sep 14 10:00:00 2026 +0000\n\n    Maintain unrelated component 13\n    \n    Routine fixture note 13: refresh unrelated sample metadata without changing external behavior.\n\ncommit 6f99aa61c064df2804e211d72332f1fe3200edb0\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sun Sep 13 10:00:00 2026 +0000\n\n"
+    },
+    {
+      "id": "s7",
+      "start": 4290,
+      "end": 4887,
+      "text": "    Maintain unrelated component 12\n    \n    Routine fixture note 12: refresh unrelated sample metadata without changing external behavior.\n\ncommit 81c44a4476f88dd41a17bdbd47df282fa0df2bc2\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sat Sep 12 10:00:00 2026 +0000\n\n    Maintain unrelated component 11\n    \n    Routine fixture note 11: refresh unrelated sample metadata without changing external behavior.\n\ncommit b0286046053251ee52c58f11216a3fada5c41348\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Fri Sep 11 10:00:00 2026 +0000\n\n    Maintain unrelated component 10\n    \n"
+    },
+    {
+      "id": "s8",
+      "start": 4887,
+      "end": 5473,
+      "text": "    Routine fixture note 10: refresh unrelated sample metadata without changing external behavior.\n\ncommit a44f1948c1a456bad713dcfc6fe80086fe18a4c1\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Thu Sep 10 10:00:00 2026 +0000\n\n    Revert connection-pool optimization\n    \n    Rollback reason: tenant-cedar-38 leaked lease counters during reconnect. Do not retry until counter ownership is repaired.\n\ncommit eeffd158df5d8873679f627516379d038e244cbf\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Wed Sep 9 10:00:00 2026 +0000\n\n    Maintain unrelated component 8\n    \n"
+    },
+    {
+      "id": "s9",
+      "start": 5473,
+      "end": 6122,
+      "text": "    Routine fixture note 8: refresh unrelated sample metadata without changing external behavior.\n\ncommit 93054796b756a0c03090d75c4ffcd4e9b5635c4d\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Tue Sep 8 10:00:00 2026 +0000\n\n    Maintain unrelated component 7\n    \n    Routine fixture note 7: refresh unrelated sample metadata without changing external behavior.\n\ncommit 7968c3b058c5fac259fcb4b24b3620f74938c81d\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Mon Sep 7 10:00:00 2026 +0000\n\n    Maintain unrelated component 6\n    \n    Routine fixture note 6: refresh unrelated sample metadata without changing external behavior.\n\n"
+    },
+    {
+      "id": "s10",
+      "start": 6122,
+      "end": 6769,
+      "text": "commit a0c159f37c89fd4ca81d0de010b99618134dd092\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sun Sep 6 10:00:00 2026 +0000\n\n    Maintain unrelated component 5\n    \n    Routine fixture note 5: refresh unrelated sample metadata without changing external behavior.\n\ncommit 879ceae7cf522231ca246371351cbbe7352639c7\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sat Sep 5 10:00:00 2026 +0000\n\n    Maintain unrelated component 4\n    \n    Routine fixture note 4: refresh unrelated sample metadata without changing external behavior.\n\ncommit 9b5842a91898a84a04b2a6ef9758bf31d0109b09\nAuthor: Fixture Author <fixture@example.invalid>\n"
+    },
+    {
+      "id": "s11",
+      "start": 6769,
+      "end": 7398,
+      "text": "Date:   Fri Sep 4 10:00:00 2026 +0000\n\n    Maintain unrelated component 3\n    \n    Routine fixture note 3: refresh unrelated sample metadata without changing external behavior.\n\ncommit a286b0392e55edb7682d7c1bee53ad5e701871e4\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Thu Sep 3 10:00:00 2026 +0000\n\n    Maintain unrelated component 2\n    \n    Routine fixture note 2: refresh unrelated sample metadata without changing external behavior.\n\ncommit 7ca7c7b164aae12cbaadb275c80a42452d81ffbe\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Wed Sep 2 10:00:00 2026 +0000\n\n    Maintain unrelated component 1\n    \n"
+    },
+    {
+      "id": "s12",
+      "start": 7398,
+      "end": 7771,
+      "text": "    Routine fixture note 1: refresh unrelated sample metadata without changing external behavior.\n\ncommit cb8c1fad0ffaf93508347e681b197e1f4fa4e79c\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Tue Sep 1 10:00:00 2026 +0000\n\n    Maintain unrelated component 0\n    \n    Routine fixture note 0: refresh unrelated sample metadata without changing external behavior.\n"
+    }
+  ],
+  "scores": {
+    "s0": 0.08,
+    "s1": 0.08,
+    "s2": 0.07,
+    "s3": 0.12,
+    "s4": 0.91,
+    "s5": 0.43,
+    "s6": 0.14,
+    "s7": 0.11,
+    "s8": 0.12,
+    "s9": 0.1,
+    "s10": 0.07,
+    "s11": 0.06,
+    "s12": 0.07
+  },
+  "selected": [
+    "s4"
+  ],
+  "bitmapBase64": "EAA=",
+  "bitLength": 13,
+  "text": "[source lines/offset 2401..3041]\n    Routine fixture note 19: refresh unrelated sample metadata without changing external behavior.\n\ncommit 79a8fe14676c13492969a371b838f7fc66bba39b\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Sat Sep 19 10:00:00 2026 +0000\n\n    Stage invoice migration\n    \n    Rollout requires MIGRATE_SILVER_52=enabled. Rollback command: db undo --tag silver-52.\n\ncommit ed1bd6e8ec89bb69a99738b011f0b06a98339a4e\nAuthor: Fixture Author <fixture@example.invalid>\nDate:   Fri Sep 18 10:00:00 2026 +0000\n\n    Maintain unrelated component 17\n    \n    Routine fixture note 17: refresh unrelated sample metadata without changing external behavior.\n\n",
+  "budgetChars": 3108,
+  "latencyMs": 250.22900000000004,
+  "usage": {
+    "input_tokens": 4749,
+    "output_tokens": 228
+  },
+  "model": "jev-1.13.0",
+  "status": "ok"
+}

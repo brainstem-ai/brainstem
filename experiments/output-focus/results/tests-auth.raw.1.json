@@ -1,0 +1,33 @@
+{
+  "caseId": "tests-auth",
+  "arm": "raw",
+  "repeat": 1,
+  "textChars": 4588,
+  "answer": "Server returned 'relay-cobalt-17' but the test expected 'relay-amber-42'.",
+  "evidence": [
+    "expected 'relay-cobalt-17' to be 'relay-amber-42'",
+    "Expected: \"relay-amber-42\"",
+    "Received: \"relay-cobalt-17\""
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 2211.6282920000003,
+  "usage": {
+    "input": 1617,
+    "output": 75,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 1692,
+    "cost": {
+      "input": 0.00024255,
+      "output": 0.0000375,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00028005
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

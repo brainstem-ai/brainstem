@@ -1,0 +1,31 @@
+{
+  "caseId": "tsc-billing",
+  "arm": "rtk",
+  "repeat": 1,
+  "textChars": 2981,
+  "answer": "Misspelled property 'settlemantCode'; compiler suggests 'settlementCode'.",
+  "evidence": [
+    "but 'settlemantCode' does not exist in type 'Billing'. Did you mean to write 'settlementCode'?"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 3025.8214579999985,
+  "usage": {
+    "input": 6,
+    "output": 58,
+    "cacheRead": 1024,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 1088,
+    "cost": {
+      "input": 9e-7,
+      "output": 0.000029,
+      "cacheRead": 0.00003072,
+      "cacheWrite": 0,
+      "total": 0.00006062
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

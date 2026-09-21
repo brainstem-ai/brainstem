@@ -1,0 +1,32 @@
+{
+  "caseId": "search-negative",
+  "arm": "raw",
+  "repeat": 1,
+  "textChars": 11290,
+  "answer": "The captured output establishes the production issuer URL (production/config.ts) but contains no timeout value in milliseconds; retrieval of production/config.ts (or related timeout config) is required.",
+  "evidence": [
+    "25:production/config.ts: issuer = https://issuer.pearl-46.example/v2",
+    "82:deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer"
+  ],
+  "needMore": true,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1448.7704999999987,
+  "usage": {
+    "input": 28,
+    "output": 94,
+    "cacheRead": 2944,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3066,
+    "cost": {
+      "input": 0.0000042,
+      "output": 0.000047,
+      "cacheRead": 0.00008832,
+      "cacheWrite": 0,
+      "total": 0.00013952
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

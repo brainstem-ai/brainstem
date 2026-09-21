@@ -1,0 +1,32 @@
+{
+  "caseId": "search-auth",
+  "arm": "raw",
+  "repeat": 0,
+  "textChars": 11290,
+  "answer": "https://issuer.pearl-46.example/v2 (production/config.ts); note deploy/runtime.env contains an override: https://legacy.topaz-93.example/v1",
+  "evidence": [
+    "production/config.ts: issuer = https://issuer.pearl-46.example/v2",
+    "deploy/runtime.env: AUTH_ISSUER_OVERRIDE=https://legacy.topaz-93.example/v1 overrides production issuer"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 1449.8657089999979,
+  "usage": {
+    "input": 2968,
+    "output": 89,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3057,
+    "cost": {
+      "input": 0.0004452,
+      "output": 0.0000445,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0004897
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

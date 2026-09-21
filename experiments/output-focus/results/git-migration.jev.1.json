@@ -1,0 +1,31 @@
+{
+  "caseId": "git-migration",
+  "arm": "jev",
+  "repeat": 1,
+  "textChars": 673,
+  "answer": "MIGRATE_SILVER_52=enabled; rollback: db undo --tag silver-52",
+  "evidence": [
+    "Rollout requires MIGRATE_SILVER_52=enabled. Rollback command: db undo --tag silver-52."
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1574.9084590000057,
+  "usage": {
+    "input": 41,
+    "output": 61,
+    "cacheRead": 320,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 422,
+    "cost": {
+      "input": 0.0000061499999999999996,
+      "output": 0.0000305,
+      "cacheRead": 0.0000096,
+      "cacheWrite": 0,
+      "total": 0.00004625
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

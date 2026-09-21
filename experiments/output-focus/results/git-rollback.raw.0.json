@@ -1,0 +1,31 @@
+{
+  "caseId": "git-rollback",
+  "arm": "raw",
+  "repeat": 0,
+  "textChars": 7771,
+  "answer": "The revert commit (a44f1948) records: tenant-cedar-38 leaked lease counters during reconnect; do not retry until counter ownership is repaired.",
+  "evidence": [
+    "Rollback reason: tenant-cedar-38 leaked lease counters during reconnect. Do not retry until counter ownership is repaired."
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1911.0912080000016,
+  "usage": {
+    "input": 2458,
+    "output": 71,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 2529,
+    "cost": {
+      "input": 0.00036869999999999996,
+      "output": 0.000035499999999999996,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00040419999999999996
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

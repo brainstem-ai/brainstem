@@ -1,0 +1,32 @@
+{
+  "caseId": "tests-skipped",
+  "arm": "jev",
+  "repeat": 1,
+  "textChars": 1686,
+  "answer": "expired service token rejects marker violet-83",
+  "evidence": [
+    "↓ pilot.test.ts > expired service token rejects marker violet-83",
+    "Tests  2 failed | 46 passed | 1 skipped"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1576.9193340000002,
+  "usage": {
+    "input": 45,
+    "output": 50,
+    "cacheRead": 704,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 799,
+    "cost": {
+      "input": 0.00000675,
+      "output": 0.000024999999999999998,
+      "cacheRead": 0.000021119999999999998,
+      "cacheWrite": 0,
+      "total": 0.00005287
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

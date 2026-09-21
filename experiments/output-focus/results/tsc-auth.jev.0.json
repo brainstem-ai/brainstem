@@ -1,0 +1,32 @@
+{
+  "caseId": "tsc-auth",
+  "arm": "jev",
+  "repeat": 0,
+  "textChars": 590,
+  "answer": "The supplied string literal was 'legacy-orchid-29', but the required literal type was 'signed-jade-64'.",
+  "evidence": [
+    "Type '\"legacy-orch-29\"' is not assignable",
+    "authorization.ts(1,14)"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": false,
+  "latencyMs": 2164.276999999998,
+  "usage": {
+    "input": 331,
+    "output": 62,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 393,
+    "cost": {
+      "input": 0.00004965,
+      "output": 0.000031,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00008065000000000001
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

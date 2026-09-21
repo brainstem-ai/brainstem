@@ -1,0 +1,31 @@
+{
+  "caseId": "search-auth",
+  "arm": "raw",
+  "repeat": 1,
+  "textChars": 11290,
+  "answer": "The configured production authentication issuer is https://issuer.pearl-46.example/v2",
+  "evidence": [
+    "25:production/config.ts: issuer = https://issuer.pearl-46.example/v2"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1243.1565000000046,
+  "usage": {
+    "input": 24,
+    "output": 51,
+    "cacheRead": 2944,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 3019,
+    "cost": {
+      "input": 0.0000036,
+      "output": 0.0000255,
+      "cacheRead": 0.00008832,
+      "cacheWrite": 0,
+      "total": 0.00011742
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

@@ -1,0 +1,29 @@
+{
+  "caseId": "tests-slow",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 174,
+  "answer": "{\"answer\":\"Cannot determine from this output — the verbose reporter view only lists the two failing tests (PASS 46 total unlisted) and no per-test durations. Retrieve the artifact to find the slowest passing test.\",\"evidence\":[\"PASS (46) FAIL (2)\",\"Time: 641ms\"],needMore:true}",
+  "evidence": [],
+  "needMore": false,
+  "correct": false,
+  "grounded": false,
+  "latencyMs": 3150.2004170000005,
+  "usage": {
+    "input": 219,
+    "output": 84,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 16,
+    "totalTokens": 303,
+    "cost": {
+      "input": 0.00003285,
+      "output": 0.000042,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00007485
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

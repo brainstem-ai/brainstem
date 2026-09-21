@@ -1,0 +1,62 @@
+{
+  "caseId": "git-migration",
+  "arm": "rtk",
+  "repeat": 1,
+  "textChars": 196,
+  "answer": "Not shown in the current output; the migration commit body is not visible among the last 28 commits as displayed.",
+  "evidence": [
+    "Maintain unrelated component 27"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 3503.3944580000025,
+  "usage": {
+    "input": 236,
+    "output": 53,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 9,
+    "totalTokens": 289,
+    "cost": {
+      "input": 0.0000354,
+      "output": 0.0000265,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0000619
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "git-migration",
+    "arm": "rtk",
+    "repeat": 1,
+    "textChars": 7771,
+    "answer": "Set MIGRATE_SILVER_52=enabled; rollback with db undo --tag silver-52.",
+    "evidence": [
+      "Rollout requires MIGRATE_SILVER_52=enabled. Rollback command: db undo --tag silver-52."
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 1707.8321670000005,
+    "usage": {
+      "input": 20,
+      "output": 62,
+      "cacheRead": 2432,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 2514,
+      "cost": {
+        "input": 0.000003,
+        "output": 0.000031,
+        "cacheRead": 0.00007295999999999999,
+        "cacheWrite": 0,
+        "total": 0.00010695999999999999
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

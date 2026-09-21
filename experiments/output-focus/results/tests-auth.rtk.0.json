@@ -1,0 +1,64 @@
+{
+  "caseId": "tests-auth",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 174,
+  "answer": "The tool output only shows that the test 'authentication response uses the expected relay header' failed, but does not include the actual vs. expected header values. Retrieval of the detailed output is required.",
+  "evidence": [
+    "FAIL  pilot.test.ts > authentication response uses the expected relay header"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 2968.4665410000002,
+  "usage": {
+    "input": 214,
+    "output": 73,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 6,
+    "totalTokens": 287,
+    "cost": {
+      "input": 0.0000321,
+      "output": 0.0000365,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0000686
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "tests-auth",
+    "arm": "rtk",
+    "repeat": 0,
+    "textChars": 4588,
+    "answer": "The server returned header value 'relay-cobalt-17', but the test expected 'relay-amber-42'.",
+    "evidence": [
+      "expected 'relay-cobalt-17' to be 'relay-amber-42'",
+      "Expected: \"relay-amber-42\"",
+      "Received: \"relay-cobalt-17\""
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 2009.186666,
+    "usage": {
+      "input": 1612,
+      "output": 78,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 1690,
+      "cost": {
+        "input": 0.0002418,
+        "output": 0.000039,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0002808
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

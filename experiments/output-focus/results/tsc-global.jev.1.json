@@ -1,0 +1,67 @@
+{
+  "caseId": "tsc-global",
+  "arm": "jev",
+  "repeat": 1,
+  "textChars": 1193,
+  "answer": "Cannot determine the exact count from the visible output — the omitted sections may contain additional files; retrieve the full artifact.",
+  "evidence": [
+    "[... omitted sections ...]",
+    "noise-02.ts(1,14)",
+    "noise-11.ts(1,14)"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 2609.0936669999974,
+  "usage": {
+    "input": 521,
+    "output": 62,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 583,
+    "cost": {
+      "input": 0.00007815,
+      "output": 0.000031,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00010915
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "tsc-global",
+    "arm": "jev",
+    "repeat": 1,
+    "textChars": 2981,
+    "answer": "25 distinct source files have compiler diagnostics.",
+    "evidence": [
+      "../../..<fixture>/compiler/authorization.ts(1,14)",
+      "../../..<fixture>/compiler/billing.ts(2,35)",
+      "../../..<fixture>/compiler/noise-00.ts(1,14)",
+      "../../..<fixture>/compiler/noise-23.ts(1,14)"
+    ],
+    "needMore": false,
+    "correct": false,
+    "grounded": true,
+    "latencyMs": 2274.5180419999997,
+    "usage": {
+      "input": 4,
+      "output": 93,
+      "cacheRead": 1024,
+      "cacheWrite": 0,
+      "reasoning": 15,
+      "totalTokens": 1121,
+      "cost": {
+        "input": 6e-7,
+        "output": 0.0000465,
+        "cacheRead": 0.00003072,
+        "cacheWrite": 0,
+        "total": 0.00007782
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

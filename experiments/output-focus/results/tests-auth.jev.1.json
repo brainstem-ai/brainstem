@@ -1,0 +1,33 @@
+{
+  "caseId": "tests-auth",
+  "arm": "jev",
+  "repeat": 1,
+  "textChars": 1357,
+  "answer": "The server returned the relay header value 'relay-cobalt-17', but the test expected 'relay-amber-42'.",
+  "evidence": [
+    "expected 'relay-cobalt-17' to be 'relay-amber-42' // Object.is equality",
+    "Expected: \"relay-amber-42\"",
+    "Received: \"relay-cobalt-17\""
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 2188.566833,
+  "usage": {
+    "input": 23,
+    "output": 84,
+    "cacheRead": 576,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 683,
+    "cost": {
+      "input": 0.00000345,
+      "output": 0.000042,
+      "cacheRead": 0.000017279999999999997,
+      "cacheWrite": 0,
+      "total": 0.00006272999999999999
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

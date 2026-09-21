@@ -1,0 +1,31 @@
+{
+  "caseId": "git-migration",
+  "arm": "raw",
+  "repeat": 0,
+  "textChars": 7771,
+  "answer": "Stage invoice migration requires env switch MIGRATE_SILVER_52=enabled; rollback via: db undo --tag silver-52",
+  "evidence": [
+    "Rollout requires MIGRATE_SILVER_52=enabled. Rollback command: db undo --tag silver-52."
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1440.6708750000034,
+  "usage": {
+    "input": 2457,
+    "output": 68,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 2525,
+    "cost": {
+      "input": 0.00036855,
+      "output": 0.000034,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00040255
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

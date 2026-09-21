@@ -1,0 +1,63 @@
+{
+  "caseId": "git-migration",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 196,
+  "answer": "The supplied log does not include the migration commit, so the required environment switch and rollback command cannot be determined from this output.",
+  "evidence": [
+    "Maintain unrelated component 27",
+    "[+136 lines omitted]"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 2282.8793750000004,
+  "usage": {
+    "input": 236,
+    "output": 62,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 9,
+    "totalTokens": 298,
+    "cost": {
+      "input": 0.0000354,
+      "output": 0.000031,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0000664
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "git-migration",
+    "arm": "rtk",
+    "repeat": 0,
+    "textChars": 7771,
+    "answer": "Set MIGRATE_SILVER_52=enabled; rollback with db undo --tag silver-52.",
+    "evidence": [
+      "Rollout requires MIGRATE_SILVER_52=enabled. Rollback command: db undo --tag silver-52."
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 1773.6074999999983,
+    "usage": {
+      "input": 2452,
+      "output": 62,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 2514,
+      "cost": {
+        "input": 0.0003678,
+        "output": 0.000031,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0003988
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

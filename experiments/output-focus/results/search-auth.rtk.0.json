@@ -1,0 +1,31 @@
+{
+  "caseId": "search-auth",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 11290,
+  "answer": "https://issuer.pearl-46.example/v2",
+  "evidence": [
+    "production/config.ts: issuer = https://issuer.pearl-46.example/v2"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1419.4133329999968,
+  "usage": {
+    "input": 2968,
+    "output": 79,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 36,
+    "totalTokens": 3047,
+    "cost": {
+      "input": 0.0004452,
+      "output": 0.0000395,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00048469999999999996
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}

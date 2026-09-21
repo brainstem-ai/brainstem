@@ -1,0 +1,103 @@
+[
+  {
+    "id": "tests-auth",
+    "capture": "tests",
+    "task": "Diagnose the authentication assertion failure. What exact header value did the server return, and which value was expected?",
+    "required": [
+      "relay-cobalt-17",
+      "relay-amber-42"
+    ]
+  },
+  {
+    "id": "tests-slow",
+    "capture": "tests",
+    "task": "Investigate test performance rather than correctness. Which passing test is the slow fixture that should be profiled next? Give its complete test name.",
+    "required": [
+      "archive export retains marker quartz-71"
+    ]
+  },
+  {
+    "id": "tests-skipped",
+    "capture": "tests",
+    "task": "Audit test coverage before release. Which authorization test was skipped and therefore did not verify its behavior? Give its complete name.",
+    "required": [
+      "expired service token rejects marker violet-83"
+    ]
+  },
+  {
+    "id": "tsc-billing",
+    "capture": "tsc",
+    "task": "Fix the billing compiler error first. Which exact object property is misspelled, and what property does the compiler suggest?",
+    "required": [
+      "settlemantCode",
+      "settlementCode"
+    ]
+  },
+  {
+    "id": "tsc-auth",
+    "capture": "tsc",
+    "task": "Resolve the authorization compiler error. Which string literal was supplied, and what literal type was required?",
+    "required": [
+      "legacy-orchid-29",
+      "signed-jade-64"
+    ]
+  },
+  {
+    "id": "tsc-global",
+    "capture": "tsc",
+    "task": "Assess how broad the build failure is before choosing a repair strategy. How many distinct source files have compiler diagnostics? Report the exact count.",
+    "required": [
+      "26"
+    ]
+  },
+  {
+    "id": "git-rollback",
+    "capture": "git",
+    "task": "Before retrying the connection-pool optimization, identify the exact rollback reason recorded in its commit body.",
+    "required": [
+      "tenant-cedar-38",
+      "lease counters"
+    ]
+  },
+  {
+    "id": "git-migration",
+    "capture": "git",
+    "task": "Prepare the migration rollout. What exact environment switch and rollback command does the migration commit body require?",
+    "required": [
+      "MIGRATE_SILVER_52",
+      "db undo --tag silver-52"
+    ]
+  },
+  {
+    "id": "git-subject",
+    "capture": "git",
+    "task": "Find the commit about correcting retry jitter. Give its exact subject, including the tracking identifier.",
+    "required": [
+      "Correct retry jitter [OPS-739]"
+    ]
+  },
+  {
+    "id": "search-auth",
+    "capture": "search",
+    "task": "Determine the configured production authentication issuer. Report the exact URI from the production config, not test or archived fixtures.",
+    "required": [
+      "https://issuer.pearl-46.example/v2"
+    ]
+  },
+  {
+    "id": "search-override",
+    "capture": "search",
+    "task": "Explain why the deployment still points to the old issuer. Identify the exact environment variable overriding the production config and its legacy URI.",
+    "required": [
+      "AUTH_ISSUER_OVERRIDE",
+      "https://legacy.topaz-93.example/v1"
+    ]
+  },
+  {
+    "id": "search-negative",
+    "capture": "search",
+    "task": "Determine the production issuer timeout in milliseconds. If the captured search output does not establish it, explicitly request more evidence rather than guessing.",
+    "required": [],
+    "absent": true
+  }
+]

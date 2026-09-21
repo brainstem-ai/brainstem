@@ -1,0 +1,63 @@
+{
+  "caseId": "tests-slow",
+  "arm": "rtk",
+  "repeat": 1,
+  "textChars": 174,
+  "answer": "The output lists only PASS/FAIL counts and two failing tests with no per-test durations, so the slowest passing test cannot be identified from this view.",
+  "evidence": [
+    "PASS (46) FAIL (2)",
+    "Time: 641ms"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 2364.4002089999994,
+  "usage": {
+    "input": 219,
+    "output": 68,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 8,
+    "totalTokens": 287,
+    "cost": {
+      "input": 0.00003285,
+      "output": 0.000034,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00006685
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "tests-slow",
+    "arm": "rtk",
+    "repeat": 1,
+    "textChars": 4588,
+    "answer": "pilot.test.ts > archive export retains marker quartz-71",
+    "evidence": [
+      "✓ pilot.test.ts > archive export retains marker quartz-71 352ms"
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 1498.244999999999,
+    "usage": {
+      "input": 1617,
+      "output": 44,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 1661,
+      "cost": {
+        "input": 0.00024255,
+        "output": 0.000022,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00026455
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

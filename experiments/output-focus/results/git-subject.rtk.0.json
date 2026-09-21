@@ -1,0 +1,62 @@
+{
+  "caseId": "git-subject",
+  "arm": "rtk",
+  "repeat": 0,
+  "textChars": 196,
+  "answer": "The retry jitter commit is not present in the provided log view; only 'Maintain unrelated component 27' is visible. Retrieval of the full git log output is needed.",
+  "evidence": [
+    "Maintain unrelated component 27"
+  ],
+  "needMore": true,
+  "correct": false,
+  "grounded": true,
+  "latencyMs": 3711.2150829999955,
+  "usage": {
+    "input": 235,
+    "output": 102,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 46,
+    "totalTokens": 337,
+    "cost": {
+      "input": 0.000035249999999999996,
+      "output": 0.000051,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.00008625
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop",
+  "recovery": {
+    "caseId": "git-subject",
+    "arm": "rtk",
+    "repeat": 0,
+    "textChars": 7771,
+    "answer": "Correct retry jitter [OPS-739]",
+    "evidence": [
+      "Correct retry jitter [OPS-739]"
+    ],
+    "needMore": false,
+    "correct": true,
+    "grounded": true,
+    "latencyMs": 1087.825834000003,
+    "usage": {
+      "input": 2451,
+      "output": 33,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 2484,
+      "cost": {
+        "input": 0.00036764999999999996,
+        "output": 0.000016499999999999998,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.00038415
+      }
+    },
+    "responseModel": "glm-5.3-flash",
+    "stopReason": "stop"
+  }
+}

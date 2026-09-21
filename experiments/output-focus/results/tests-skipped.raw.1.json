@@ -1,0 +1,32 @@
+{
+  "caseId": "tests-skipped",
+  "arm": "raw",
+  "repeat": 1,
+  "textChars": 4588,
+  "answer": "expired service token rejects marker violet-83",
+  "evidence": [
+    "↓ pilot.test.ts > expired service token rejects marker violet-83",
+    "test.skip('expired service token rejects marker violet-83', () => {})"
+  ],
+  "needMore": false,
+  "correct": true,
+  "grounded": true,
+  "latencyMs": 1890.8566249999985,
+  "usage": {
+    "input": 1618,
+    "output": 53,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "reasoning": 0,
+    "totalTokens": 1671,
+    "cost": {
+      "input": 0.0002427,
+      "output": 0.0000265,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "total": 0.0002692
+    }
+  },
+  "responseModel": "glm-5.3-flash",
+  "stopReason": "stop"
+}
