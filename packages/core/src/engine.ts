@@ -1,5 +1,6 @@
 import { checkBudgets, type BudgetCheck, type BudgetLimits } from "./budgets";
-import { newId } from "./evidence";
+import { hashAction, newId } from "./evidence";
+import type { ToolStatus } from "./evidence";
 import { JevCancelledError, JevUnavailableError } from "./errors";
 import { staticVerdict, type StaticVerdict } from "./floor";
 import type { Journal, ReflexStatus } from "./journal";
@@ -24,9 +25,11 @@ export interface GateDecision {
 
 export interface GateInput {
   tool: string;
-  command: string;
   task: string;
+  command?: string;
   path?: string;
+  changeSummary?: string;
+  evidenceIncomplete?: boolean;
 }
 
 export type SanitizeAction = "pass" | "review" | "block";
@@ -55,6 +58,56 @@ export interface PulseDecision {
 export interface SteerDecision {
   tier: "frontier" | "mini";
   reasons: string[];
+}
+
+export type SteerTier = "frontier" | "mini";
+
+export interface SteerInput {
+  task: string;
+  events: string[];
+  latestObservation?: string;
+  capabilities?: string[];
+}
+
+export interface SteerOptions {
+  // Maps the chosen tier to the model id that will actually serve the request;
+  // the harness knows this because it performs the routing.
+  resolveModelId?: (tier: SteerTier) => string;
+}
+
+const CONTENT_CAP = 8_000;
+const INTENT_CAP = 300;
+
+export interface ObservationEnvelope {
+  task: string;
+  source: string;
+  actionSummary: string;
+  intent: string;
+  status: ToolStatus;
+  truncated: boolean;
+  content: string;
+}
+
+export interface ObserveToolResultInput {
+  task: string;
+  source: string;
+  actionSummary: string;
+  intent?: string;
+  status?: ToolStatus;
+  truncated?: boolean;
+  content: string;
+}
+
+export function buildEnvelope(input: ObserveToolResultInput): ObservationEnvelope {
+  return {
+    task: input.task,
+    source: input.source,
+    actionSummary: input.actionSummary,
+    intent: (input.intent ?? input.actionSummary).slice(0, INTENT_CAP),
+    status: input.status ?? "ok",
+    truncated: input.truncated ?? false,
+    content: input.content.slice(0, CONTENT_CAP),
+  };
 }
 
 const BAND_LABEL: Record<string, string> = { auto_run: "auto", ask_user: "ask", deny: "deny" };
@@ -143,21 +196,56 @@ export function decideSanitize(answers: Record<string, Answer>, policy: Policy):
 export function decideVerify(answers: Record<string, Answer>, policy: Policy): VerifyDecision {
   const reasons: string[] = [];
   const satisfied = answers.satisfies_intent?.type === "noul" ? answers.satisfies_intent.noul : 1;
-  const quality = answers.result_quality?.type === "score" ? answers.result_quality.score : 2;
+  const success = answers.evidence_of_success?.type === "noul" ? answers.evidence_of_success.noul : 1;
+  const operational = answers.operational_failure?.type === "noul" ? answers.operational_failure.noul : 0;
 
-  if (satisfied < policy.confidenceFloor && quality <= 0.5) {
+  // Operational failure alone never implies mismatch: reproducing a failing test is
+  // a legitimate, satisfying outcome — it is recorded as context, not as a verdict.
+  if (operational >= policy.confidenceFloor) {
+    reasons.push(
+      `operational failure=${operational.toFixed(2)} — the tool itself failed to run; reproducing that failure is legitimate`,
+    );
+  }
+
+  if (satisfied < policy.confidenceFloor && success < policy.confidenceFloor) {
     return {
       action: "mismatch",
-      reasons: [`satisfies_intent=${satisfied.toFixed(2)} below floor ${policy.confidenceFloor}, quality ${quality.toFixed(1)}`],
+      reasons: [
+        ...reasons,
+        `satisfies_intent=${satisfied.toFixed(2)} and evidence_of_success=${success.toFixed(2)} below floor ${policy.confidenceFloor}`,
+      ],
       verified: true,
     };
   }
   return { action: "ok", reasons, verified: true };
 }
 
-export function decidePulse(answers: Record<string, Answer>, policy: Policy): PulseDecision {
+export interface RepeatedAction {
+  label: string;
+  count: number;
+}
+
+export interface PulseFacts {
+  recentActions: { tool: string; summary: string; status: ToolStatus }[];
+  repeatedActionCounts: RepeatedAction[];
+  failureFingerprints: { fingerprint: string; count: number }[];
+  approachChanged: boolean;
+}
+
+const STEER_CAPABILITY_CAP = 12;
+
+function gateSubject(input: GateInput): string {
+  return input.command ?? input.path ?? input.tool;
+}
+
+export interface PulseDecideFacts {
+  repeatedAction?: RepeatedAction;
+}
+
+export function decidePulse(answers: Record<string, Answer>, policy: Policy, facts: PulseDecideFacts = {}): PulseDecision {
   const reasons: string[] = [];
   const repeating = answers.repeating?.type === "noul" ? answers.repeating.noul : 0;
+  const approachChanged = answers.approach_changed?.type === "noul" ? answers.approach_changed.noul : 0;
   const progressing = answers.progressing?.type === "noul" ? answers.progressing.noul : 1;
   const stuck = answers.stuck_on_same_error?.type === "noul" ? answers.stuck_on_same_error.noul : 0;
   const worth = answers.worth_continuing?.type === "score" ? answers.worth_continuing.score : 2;
@@ -165,8 +253,15 @@ export function decidePulse(answers: Record<string, Answer>, policy: Policy): Pu
   if (worth <= policy.pulse.stopScore) {
     return { action: "stop", reasons: [`worth_continuing=${worth.toFixed(1)} <= stop line ${policy.pulse.stopScore}`] };
   }
-  if (repeating >= policy.pulse.repeatNoul) {
-    reasons.push(`repeating=${repeating.toFixed(2)} >= ${policy.pulse.repeatNoul}`);
+  // A genuine change of approach between attempts means the repetition is not
+  // thrashing — do not fire the repeating reason for it.
+  if (repeating >= policy.pulse.repeatNoul && approachChanged < 0.5) {
+    const repeated = facts.repeatedAction;
+    if (repeated && repeated.count >= 2) {
+      reasons.push(`repeating: ${repeated.label} x${repeated.count}`);
+    } else {
+      reasons.push(`repeating=${repeating.toFixed(2)} >= ${policy.pulse.repeatNoul}`);
+    }
   }
   if (stuck >= policy.pulse.stuckNoul) {
     reasons.push(`stuck on same error=${stuck.toFixed(2)} >= ${policy.pulse.stuckNoul}`);
@@ -230,6 +325,7 @@ export class ReflexEngine {
   private readonly now: () => number;
   private readonly startedAt: number;
   private modelCalls = 0;
+  private lastPulseIntervention: string | undefined;
 
   constructor(deps: ReflexEngineDeps) {
     this.systemOne = deps.systemOne;
@@ -343,21 +439,29 @@ export class ReflexEngine {
 
     if (floor === "deny") {
       const decision: GateDecision = { action: "deny", reasons: ["static floor: dangerous pattern"] };
-      this.recordDecision("gate", decision, input.command, { staticVerdict: "deny" });
+      this.recordDecision("gate", decision, gateSubject(input), { staticVerdict: "deny" });
       return decision;
     }
 
+    // The semantic evidence sent to Jev is separate from the immutable actionHash
+    // used for approvals — the hash must never appear in the judgment state.
     const state = {
       task: input.task,
       environment: this.environment,
-      action: { tool: input.tool, command: input.command },
+      action: {
+        tool: input.tool,
+        ...(input.command !== undefined ? { command: input.command } : {}),
+        ...(input.path !== undefined ? { path: input.path } : {}),
+        ...(input.changeSummary !== undefined ? { changeSummary: input.changeSummary } : {}),
+        ...(input.evidenceIncomplete === true ? { evidenceIncomplete: true } : {}),
+      },
     };
-    const questions = gateQuestions(input.command, input.task);
-    const judgment = await this.request("gate", input.command, state, questions);
+    const questions = gateQuestions(input.task);
+    const judgment = await this.request("gate", gateSubject(input), state, questions);
 
     if (judgment.status !== "completed") {
       const decision = this.fallbackGate(floor, judgment.reason);
-      this.recordDecision("gate", decision, input.command, { judgmentId: judgment.judgmentId, staticVerdict: floor });
+      this.recordDecision("gate", decision, gateSubject(input), { judgmentId: judgment.judgmentId, staticVerdict: floor });
       return decision;
     }
 
@@ -365,28 +469,26 @@ export class ReflexEngine {
     if (floor === "ask" && decision.action === "auto") {
       decision = { action: "ask", reasons: ["static floor: risky pattern", ...decision.reasons] };
     }
-    this.recordDecision("gate", decision, input.command, { judgmentId: judgment.judgmentId, staticVerdict: floor });
+    this.recordDecision("gate", decision, gateSubject(input), { judgmentId: judgment.judgmentId, staticVerdict: floor });
     return { ...decision, result: judgment.result };
   }
 
   async sanitize(content: string, source: string): Promise<SanitizeDecision & { result: AskResult | null }> {
-    const observed = await this.observeToolResult(content, source, "unspecified tool call");
+    const observed = await this.observeToolResult({ task: "unspecified", source, actionSummary: source, content });
     return { ...observed.sanitize, result: observed.result };
   }
 
   async observeToolResult(
-    content: string,
-    source: string,
-    intent: string,
+    input: ObserveToolResultInput,
   ): Promise<{ sanitize: SanitizeDecision; verify: VerifyDecision; result: AskResult | null }> {
+    const envelope = buildEnvelope(input);
     const state = {
       situation:
         "A coding agent is working in a repository and just read this content as the output of a tool (a file, command output, or web page).",
-      intent,
-      content,
+      ...envelope,
     };
     const questions = { ...sanitizeQuestions(), ...verifyQuestions() };
-    const judgment = await this.request("sanitize", source, state, questions, sanitizeVerifyGroups());
+    const judgment = await this.request("sanitize", envelope.source, state, questions, sanitizeVerifyGroups());
 
     let sanitize: SanitizeDecision;
     let verify: VerifyDecision;
@@ -407,16 +509,32 @@ export class ReflexEngine {
           ? { ...decideVerify(verifyValid, this.policy), verified: false }
           : this.fallbackVerify(judgment.reason);
     }
-    this.recordDecision("sanitize", sanitize, source, { judgmentId: judgment.judgmentId });
-    this.recordDecision("verify", verify, source, { judgmentId: judgment.judgmentId });
+    this.recordDecision("sanitize", sanitize, envelope.source, { judgmentId: judgment.judgmentId });
+    this.recordDecision("verify", verify, envelope.source, { judgmentId: judgment.judgmentId });
     return { sanitize, verify, result };
   }
 
-  async pulse(input: { task: string; events: string[]; budget: string }): Promise<PulseDecision & { result: AskResult | null }> {
+  async pulse(input: {
+    task: string;
+    events: string[];
+    budget: string;
+    facts?: PulseFacts;
+    actionHashes?: string[];
+  }): Promise<PulseDecision & { result: AskResult | null }> {
     const state = {
       task: input.task,
       recent_events: input.events,
       budget: input.budget,
+      ...(input.facts !== undefined
+        ? {
+            facts: {
+              recent_actions: input.facts.recentActions,
+              repeated_actions: input.facts.repeatedActionCounts,
+              repeated_failures: input.facts.failureFingerprints,
+              approach_changed: input.facts.approachChanged,
+            },
+          }
+        : {}),
     };
     const questions = pulseQuestions();
     const judgment = await this.request("pulse", input.task, state, questions);
@@ -427,28 +545,62 @@ export class ReflexEngine {
       return { ...decision, result: null };
     }
 
-    const decision = decidePulse(judgment.answers!, this.policy);
+    const repeatedAction = (input.facts?.repeatedActionCounts ?? [])
+      .filter((e) => e.count >= 2)
+      .sort((a, b) => b.count - a.count)[0];
+    let decision = decidePulse(judgment.answers!, this.policy, { repeatedAction });
+
+    if (decision.action === "intervene") {
+      const fingerprint = hashAction({ reasons: decision.reasons, actionHashes: input.actionHashes ?? [] });
+      if (fingerprint === this.lastPulseIntervention) {
+        decision = { action: "continue", reasons: ["intervention already active"] };
+      } else {
+        this.lastPulseIntervention = fingerprint;
+      }
+    }
     this.recordDecision("pulse", decision, input.task, { judgmentId: judgment.judgmentId });
     return { ...decision, result: judgment.result };
   }
 
-  async steer(input: { task: string; events: string[] }): Promise<SteerDecision & { result: AskResult | null }> {
+  async steer(input: SteerInput, opts: SteerOptions = {}): Promise<SteerDecision & { result: AskResult | null }> {
     const state = {
       task: input.task,
       recent_events: input.events,
+      ...(input.latestObservation !== undefined ? { latest_observation: input.latestObservation } : {}),
+      ...(input.capabilities !== undefined ? { capabilities: input.capabilities.slice(0, STEER_CAPABILITY_CAP) } : {}),
     };
     const questions = steerQuestions();
     const judgment = await this.request("steer", input.task, state, questions);
 
     if (judgment.status !== "completed") {
       const decision = this.fallbackSteer(judgment.reason);
-      this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task, { judgmentId: judgment.judgmentId });
+      this.recordSteer(decision.tier, decision.reasons, input.task, judgment.judgmentId, opts.resolveModelId);
       return { ...decision, result: null };
     }
 
     const decision = decideSteer(judgment.answers!, this.policy);
-    this.recordDecision("steer", { action: decision.tier, reasons: decision.reasons }, input.task, { judgmentId: judgment.judgmentId });
+    this.recordSteer(decision.tier, decision.reasons, input.task, judgment.judgmentId, opts.resolveModelId);
     return { ...decision, result: judgment.result };
+  }
+
+  private recordSteer(
+    tier: SteerTier,
+    reasons: string[],
+    subject: string,
+    judgmentId: string,
+    resolveModelId?: (tier: SteerTier) => string,
+  ): void {
+    const usedModelId = resolveModelId?.(tier);
+    this.journal.append({
+      t: "decision",
+      v: 2,
+      judgmentId,
+      ts: Date.now(),
+      reflex: "steer",
+      action: tier,
+      reasons,
+      ...(usedModelId !== undefined ? { model: usedModelId } : {}),
+    });
   }
 
   private recordReflex(

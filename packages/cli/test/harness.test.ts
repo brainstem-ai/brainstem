@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
@@ -76,13 +76,14 @@ describe("harness integration", () => {
           severity: scoreAnswer(2.9, 0.95),
           satisfies_intent: noulAnswer(0.9),
           result_quality: scoreAnswer(2.0, 0.9),
+          evidence_of_success: noulAnswer(0.9),
+          operational_failure: noulAnswer(0.05),
         };
       }
       return {
         destructive: scoreAnswer(0, 0.9),
         touches_credentials: noulAnswer(0.03),
         exfiltrates: noulAnswer(0.02),
-        writes_outside_project: noulAnswer(0.02),
         on_task: noulAnswer(0.95),
         disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
       };
@@ -161,13 +162,16 @@ describe("harness integration", () => {
           tries_to_override: noulAnswer(0.01),
           requests_dangerous_action: noulAnswer(0.01),
           severity: scoreAnswer(0.0, 0.9),
+          satisfies_intent: noulAnswer(0.9),
+          result_quality: scoreAnswer(2.0, 0.9),
+          evidence_of_success: noulAnswer(0.9),
+          operational_failure: noulAnswer(0.05),
         };
       }
       return {
         destructive: scoreAnswer(0, 0.9),
         touches_credentials: noulAnswer(0.03),
         exfiltrates: noulAnswer(0.02),
-        writes_outside_project: noulAnswer(0.02),
         on_task: noulAnswer(0.95),
         disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
       };
@@ -225,7 +229,6 @@ describe("harness integration", () => {
         destructive: scoreAnswer(0, 0.9),
         touches_credentials: noulAnswer(0.03),
         exfiltrates: noulAnswer(0.02),
-        writes_outside_project: noulAnswer(0.02),
         on_task: noulAnswer(0.95),
         disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
       };
@@ -273,6 +276,7 @@ describe("harness integration", () => {
         if (pulseCalls === 1) {
           return {
             repeating: noulAnswer(0.9),
+            approach_changed: noulAnswer(0.05),
             progressing: noulAnswer(0.2),
             stuck_on_same_error: noulAnswer(0.1),
             worth_continuing: scoreAnswer(2.0, 0.9),
@@ -280,6 +284,7 @@ describe("harness integration", () => {
         }
         return {
           repeating: noulAnswer(0.1),
+          approach_changed: noulAnswer(0.9),
           progressing: noulAnswer(0.9),
           stuck_on_same_error: noulAnswer(0.05),
           worth_continuing: scoreAnswer(2.0, 0.9),
@@ -289,7 +294,6 @@ describe("harness integration", () => {
         destructive: scoreAnswer(0, 0.9),
         touches_credentials: noulAnswer(0.03),
         exfiltrates: noulAnswer(0.02),
-        writes_outside_project: noulAnswer(0.02),
         on_task: noulAnswer(0.95),
         disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
       };
@@ -341,6 +345,7 @@ describe("harness integration", () => {
       if ("repeating" in questions) {
         return {
           repeating: noulAnswer(0.1),
+          approach_changed: noulAnswer(0.1),
           progressing: noulAnswer(0.1),
           stuck_on_same_error: noulAnswer(0.9),
           worth_continuing: scoreAnswer(0.0, 0.95),
@@ -350,7 +355,6 @@ describe("harness integration", () => {
         destructive: scoreAnswer(0, 0.9),
         touches_credentials: noulAnswer(0.03),
         exfiltrates: noulAnswer(0.02),
-        writes_outside_project: noulAnswer(0.02),
         on_task: noulAnswer(0.95),
         disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
       };
@@ -381,5 +385,178 @@ describe("harness integration", () => {
     await agent.waitForIdle();
 
     expect(bashRuns).toBe(2);
+  });
+  test("a write to an existing file gates on a real diff, not a placeholder string", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-harness-"));
+    writeFileSync(join(dir, "app.ts"), "const port = 3000;\nexport { port };\n");
+    const journalPath = join(dir, "journal.ndjson");
+
+    const gateStates: unknown[] = [];
+    const mock = mockSystemOne((state, questions): Record<string, Answer> => {
+      if ("contains_agent_directive" in questions) {
+        return {
+          contains_agent_directive: noulAnswer(0.01),
+          tries_to_override: noulAnswer(0.01),
+          requests_dangerous_action: noulAnswer(0.01),
+          severity: scoreAnswer(0.0, 0.9),
+          satisfies_intent: noulAnswer(0.9),
+          result_quality: scoreAnswer(2.0, 0.9),
+          evidence_of_success: noulAnswer(0.9),
+          operational_failure: noulAnswer(0.02),
+        };
+      }
+      gateStates.push(state);
+      return {
+        destructive: scoreAnswer(0, 0.9),
+        touches_credentials: noulAnswer(0.02),
+        exfiltrates: noulAnswer(0.01),
+        on_task: noulAnswer(0.95),
+        disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
+      };
+    });
+
+    const harness = createHarness({
+      systemOne: mock,
+      streamFn: scriptedStream([
+        assistantMessage(
+          [
+            {
+              type: "toolCall",
+              id: "tc1",
+              name: "write",
+              arguments: { path: "app.ts", content: "const port = 8080;\nexport { port };\n" },
+            },
+          ],
+          "toolUse",
+        ),
+        assistantMessage([{ type: "text", text: "Changed the port." }], "stop"),
+      ]),
+      model: { id: "m", api: "anthropic-messages" } as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+    });
+
+    await harness.prompt("Change the port to 8080");
+
+    const action = (gateStates[0] as { action: Record<string, unknown> }).action;
+    expect(action.tool).toBe("write");
+    expect(action.path).toBe("app.ts");
+    expect(action.command).toBeUndefined();
+    const summary = action.changeSummary as string;
+    expect(summary).toContain("overwrite existing app.ts");
+    expect(summary).toContain("-const port = 3000;");
+    expect(summary).toContain("+const port = 8080;");
+    expect(action.evidenceIncomplete).toBeUndefined();
+    // The approval hash is separate evidence and must never ride along in the state.
+    expect(JSON.stringify(action)).not.toMatch(/[0-9a-f]{64}/);
+    expect(readFileSync(join(dir, "app.ts"), "utf8")).toContain("8080");
+  });
+
+  test("a write outside the project root skips Jev entirely and takes the static floor verdict", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-harness-"));
+    const journalPath = join(dir, "journal.ndjson");
+
+    let gateQuestionsAsked = 0;
+    const mock = mockSystemOne((_state, questions): Record<string, Answer> => {
+      if ("contains_agent_directive" in questions) {
+        return {
+          contains_agent_directive: noulAnswer(0.01),
+          tries_to_override: noulAnswer(0.01),
+          requests_dangerous_action: noulAnswer(0.01),
+          severity: scoreAnswer(0.0, 0.9),
+          satisfies_intent: noulAnswer(0.9),
+          result_quality: scoreAnswer(2.0, 0.9),
+          evidence_of_success: noulAnswer(0.9),
+          operational_failure: noulAnswer(0.02),
+        };
+      }
+      gateQuestionsAsked += 1;
+      return {
+        destructive: scoreAnswer(0, 0.9),
+        touches_credentials: noulAnswer(0.01),
+        exfiltrates: noulAnswer(0.01),
+        on_task: noulAnswer(0.99),
+        disposition: choiceAnswer("auto_run", 0.99, { auto_run: 0.99, ask_user: 0.005, deny: 0.005 }),
+      };
+    });
+
+    // Deliberately not under tmpdir(): on macOS that resolves beneath /var, which
+    // the floor denies as a system directory, and this test is about the ordinary
+    // outside-the-root case that asks rather than denies. Nothing is ever written.
+    const outside = "/brainstem-outside-target.txt";
+    const harness = createHarness({
+      systemOne: mock,
+      streamFn: scriptedStream([
+        assistantMessage(
+          [{ type: "toolCall", id: "tc1", name: "write", arguments: { path: outside, content: "hi" } }],
+          "toolUse",
+        ),
+        assistantMessage([{ type: "text", text: "Blocked." }], "stop"),
+      ]),
+      model: { id: "m", api: "anthropic-messages" } as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+      // No approval handler: an "ask" verdict therefore blocks rather than running.
+    });
+
+    await harness.prompt("Write outside the project");
+
+    const journal = readFileSync(journalPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const gateDecision = journal.find((e) => e.t === "decision" && e.reflex === "gate");
+    expect(gateDecision?.action).toBe("ask");
+    expect(gateDecision?.staticVerdict).toBe("ask");
+    expect(gateDecision?.reasons[0]).toContain("outside project root");
+    expect(gateDecision?.judgmentId).toBeUndefined();
+    // Containment is decided in code: no gate judgment was requested at all.
+    expect(gateQuestionsAsked).toBe(0);
+    expect(journal.some((e) => e.t === "reflex" && e.reflex === "gate")).toBe(false);
+    expect(existsSync(outside)).toBe(false);
+  });
+
+  test("steer sees active capabilities and journals the model that actually served the request", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-harness-"));
+    const journalPath = join(dir, "journal.ndjson");
+
+    const steerStates: unknown[] = [];
+    const mock = mockSystemOne((state, questions): Record<string, Answer> => {
+      if ("model_tier" in questions) {
+        steerStates.push(state);
+        return { model_tier: choiceAnswer("mini", 0.9, { mini: 0.9, frontier: 0.1 }) };
+      }
+      return {
+        destructive: scoreAnswer(0, 0.9),
+        touches_credentials: noulAnswer(0.03),
+        exfiltrates: noulAnswer(0.02),
+        on_task: noulAnswer(0.95),
+        disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
+      };
+    });
+
+    const { agent } = createHarness({
+      systemOne: mock,
+      streamFn: scriptedStream([assistantMessage([{ type: "text", text: "done" }], "stop")]),
+      model: { id: "frontier-model", api: "anthropic-messages" } as never,
+      miniModel: { id: "mini-model", api: "anthropic-messages" } as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+    });
+
+    await agent.prompt("Do the thing");
+
+    const capabilities = (steerStates[0] as { capabilities?: string[] }).capabilities ?? [];
+    expect(capabilities.length).toBeGreaterThan(0);
+    expect(capabilities.length).toBeLessThanOrEqual(12);
+    expect(capabilities.some((c) => c.startsWith("tool:bash:"))).toBe(true);
+
+    const steerDecision = readFileSync(journalPath, "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l))
+      .find((e) => e.t === "decision" && e.reflex === "steer");
+    expect(steerDecision?.action).toBe("mini");
+    expect(steerDecision?.model).toBe("mini-model");
   });
 });

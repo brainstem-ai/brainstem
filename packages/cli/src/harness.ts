@@ -2,6 +2,7 @@ import { Agent, type AgentTool, type StreamFn } from "@earendil-works/pi-agent-c
 import type { Model, Api } from "@earendil-works/pi-ai";
 import {
   ReflexEngine,
+  toIds,
   hashAction,
   newId,
   openJournal,
@@ -17,6 +18,9 @@ import {
   type ToolStatus,
   type TurnSpans,
 } from "@brainstem/core";
+import { CapabilityRegistry } from "./capabilities/registry";
+import { changeSummaryForWrite } from "./change-summary";
+import { isInside, resolveParentForWrite } from "./paths";
 import { SessionRecorder } from "./session";
 import { makeTools } from "./tools";
 
@@ -33,6 +37,7 @@ export interface HarnessOptions {
   systemPrompt?: string;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   approvalHandler?: ApprovalHandler;
+  registry?: CapabilityRegistry;
   pulseEveryTurns?: number;
   signal?: AbortSignal;
   onReflex?: (line: string) => void;
@@ -51,6 +56,7 @@ export interface Harness {
 }
 
 const EXCERPT_CAP = 2_000;
+const STEER_CAPABILITY_CAP = 12;
 
 function textOf(content: { type: string; text?: string }[]): string {
   return content
@@ -68,6 +74,12 @@ interface ToolDetails {
 
 function detailsOf(result: unknown): ToolDetails {
   return (result as { details?: ToolDetails } | undefined)?.details ?? {};
+}
+
+function actionLabel(tool: string, args: unknown): string {
+  const a = (args ?? {}) as { command?: string; path?: string; pattern?: string };
+  const subject = a.command ?? a.path ?? a.pattern;
+  return subject === undefined ? tool : `${tool}: ${subject.slice(0, 80)}`;
 }
 
 function argsSummaryFor(args: unknown): unknown {
@@ -129,6 +141,22 @@ export function createHarness(options: HarnessOptions): Harness {
   }
 
   const tools: AgentTool[] = makeTools({ cwd: options.cwd });
+  const registry = options.registry ?? new CapabilityRegistry();
+
+  // Capability descriptions are evidence for Steer only. Relevance never grants
+  // execution permission, so this is read off the active set and nothing more.
+  function activeCapabilityDescriptions(): string[] {
+    try {
+      const catalog = registry.snapshot();
+      const active = registry.workingSet().active;
+      const byId = new Map(catalog.entries.map((d) => [d.id, d.description]));
+      return toIds(active, catalog.entries)
+        .slice(0, STEER_CAPABILITY_CAP)
+        .map((id) => `${id}: ${byId.get(id) ?? ""}`);
+    } catch {
+      return [];
+    }
+  }
 
   function textOfAny(content: unknown): string {
     if (typeof content === "string") return content;
@@ -187,7 +215,7 @@ export function createHarness(options: HarnessOptions): Harness {
     delivered: string,
     why: string,
   ): void {
-    recorder.recordAction(hashAction({ tool, args: argsSummaryFor(args) }));
+    recorder.recordAction(hashAction({ tool, args: argsSummaryFor(args) }), actionLabel(tool, args));
     emitObservation(
       {
         toolCallId,
@@ -285,8 +313,20 @@ export function createHarness(options: HarnessOptions): Harness {
     firstTokenAt = undefined;
     engine.noteModelCall();
     if (options.miniModel) {
+      const latest = recorder.recentActivity(1)[0];
+      const capabilities = activeCapabilityDescriptions();
       const decision = await timedJev(() =>
-        engine.steer({ task: taskText(), events: summarizeMessages(context.messages) }),
+        engine.steer(
+          {
+            task: taskText(),
+            events: summarizeMessages(context.messages),
+            ...(latest !== undefined ? { latestObservation: latest } : {}),
+            ...(capabilities.length > 0 ? { capabilities } : {}),
+          },
+          // The harness performs the routing, so it is the only place that knows
+          // which model id a chosen tier actually resolves to.
+          { resolveModelId: (tier) => (tier === "mini" ? options.miniModel!.id : model.id) },
+        ),
       );
       options.onReflex?.(render("steer", decision.tier, decision.reasons));
       return innerStreamFn(decision.tier === "mini" ? options.miniModel : model, context, streamOptions);
@@ -313,6 +353,8 @@ export function createHarness(options: HarnessOptions): Harness {
           task: taskText(),
           events: summarizeMessages(agent.state.messages),
           budget: `${recorder.modelCalls} model calls so far`,
+          facts: recorder.pulseFacts(),
+          actionHashes: recorder.recentActionHashes.slice(-6),
         }),
       );
       options.onReflex?.(render("pulse", decision.action, decision.reasons));
@@ -337,12 +379,42 @@ export function createHarness(options: HarnessOptions): Harness {
       const toolCallId = toolCall.id;
 
       if (toolCall.name === "bash" || toolCall.name === "write") {
+        // Literal containment is decided in code, never by a judgment: a write whose
+        // resolved target leaves the configured root takes the static floor verdict
+        // and never reaches Jev.
+        if (toolCall.name === "write" && !isInside(options.cwd, resolveParentForWrite(options.cwd, a.path ?? ""))) {
+          const verdict = staticVerdict("write", { path: a.path }, options.cwd) ?? "ask";
+          const why = `static floor: write outside project root (${a.path ?? "?"})`;
+          journal.append({
+            t: "decision",
+            v: 2,
+            ts: Date.now(),
+            reflex: "gate",
+            action: verdict,
+            reasons: [why],
+            staticVerdict: verdict,
+          });
+          options.onReflex?.(render("gate", verdict, [why]));
+          if (verdict === "deny") {
+            const reason = `[brainstem] denied: ${why}. Do not retry this command.`;
+            emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
+            return { block: true, reason };
+          }
+          return await runApproval(toolCallId, toolCall.name, args, [why], signal);
+        }
+
+        const change =
+          toolCall.name === "write"
+            ? changeSummaryForWrite(options.cwd, a.path ?? "", (args as { content?: string } | undefined)?.content ?? "")
+            : undefined;
         const decision = await timedJev(() =>
           engine.gate({
             tool: toolCall.name,
-            command: toolCall.name === "write" ? `write file ${a.path ?? "?"}` : (a.command ?? ""),
             task: taskText(),
-            path: a.path,
+            ...(toolCall.name === "bash" ? { command: a.command ?? "" } : {}),
+            ...(a.path !== undefined ? { path: a.path } : {}),
+            ...(change !== undefined ? { changeSummary: change.changeSummary } : {}),
+            ...(change?.evidenceIncomplete === true ? { evidenceIncomplete: true } : {}),
           }),
         );
         options.onReflex?.(render("gate", decision.action, decision.reasons));
@@ -393,7 +465,7 @@ export function createHarness(options: HarnessOptions): Harness {
         excerpt: fullText.slice(0, EXCERPT_CAP),
         truncated: details.truncated ?? fullText.length > EXCERPT_CAP,
       };
-      recorder.recordAction(hashAction({ tool: obs.tool, args: obs.argsSummary }));
+      recorder.recordAction(hashAction({ tool: obs.tool, args: obs.argsSummary }), actionLabel(obs.tool, obs.argsSummary));
 
       let deliveredExcerpt = obs.excerpt;
       let deliveredTruncated = obs.truncated;
@@ -402,7 +474,15 @@ export function createHarness(options: HarnessOptions): Harness {
       if (!isError && fullText.trim()) {
         const intent = `${toolCall.name} ${JSON.stringify(toolCall.arguments)}`;
         const observed = await timedJev(() =>
-          engine.observeToolResult(fullText.slice(0, 8000), `tool:${toolCall.name}`, intent),
+          engine.observeToolResult({
+            task: taskText(),
+            source: `tool:${toolCall.name}`,
+            actionSummary: intent,
+            intent,
+            status: obs.status,
+            truncated: obs.truncated,
+            content: fullText.slice(0, 8000),
+          }),
         );
         options.onReflex?.(render("sanitize", observed.sanitize.action, observed.sanitize.reasons));
         if (observed.verify.action === "mismatch") {
