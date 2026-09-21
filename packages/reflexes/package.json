@@ -1,0 +1,13 @@
+{
+  "name": "@brainstem/reflexes",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./judges/generic": "./src/judges/generic.ts"
+  },
+  "dependencies": {
+    "@brainstem/core": "workspace:*",
+    "@typesafe-ai/sdk": "^0.6.0"
+  }
+}
