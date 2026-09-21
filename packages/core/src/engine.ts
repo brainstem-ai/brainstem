@@ -29,6 +29,18 @@ import {
   type SelectInput,
   SELECT_BATCH_CHAR_BUDGET,
 } from "./selection";
+import {
+  assembleFocusDecision,
+  batchSections,
+  buildExhaustiveDecision,
+  buildFallbackDecision as buildFocusFallbackDecision,
+  buildFocusQuestions,
+  decideFocus,
+  isExhaustiveTask,
+  type FocusDecision,
+  type FocusInput,
+  FOCUS_BATCH_CHAR_BUDGET,
+} from "./output-focus";
 
 export type GateAction = "auto" | "ask" | "deny";
 
@@ -457,6 +469,10 @@ export class ReflexEngine {
     return buildFallbackDecision(catalog, current, available, candidates);
   }
 
+  private fallbackFocus(manifest: import("./output-sections").SectionManifest): FocusDecision {
+    return { ...buildFocusFallbackDecision(manifest), status: "unavailable", batches: 0 };
+  }
+
   async gate(input: GateInput): Promise<GateDecision & { result?: AskResult }> {
     const floor = staticVerdict(input.tool, { command: input.command, path: input.path }, this.root);
 
@@ -660,6 +676,66 @@ export class ReflexEngine {
     this.recordDecision(
       "select",
       { action: decision.status, reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)] },
+      subject,
+      { judgmentId: lastJudgmentId },
+    );
+    return decision;
+  }
+
+  async focus(input: FocusInput): Promise<FocusDecision> {
+    if (isExhaustiveTask(input)) {
+      const decision = buildExhaustiveDecision(input.manifest);
+      this.recordDecision(
+        "focus",
+        { action: decision.mode, reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)] },
+        input.command.slice(0, 80),
+      );
+      return decision;
+    }
+
+    const candidates = input.manifest.entries;
+    const batches = batchSections(candidates, FOCUS_BATCH_CHAR_BUDGET);
+    const mergedAnswers: Record<string, Answer> = {};
+    let completedCount = 0;
+    let lastJudgmentId: string | undefined;
+    const subject = input.command.slice(0, 80);
+
+    for (const batch of batches) {
+      const questions = buildFocusQuestions(batch);
+      const sections = batch.map((s) => ({ id: s.id, text: s.text.slice(0, 2_000) }));
+      const state = {
+        task: input.task,
+        command: input.command,
+        ...(input.intent !== undefined ? { intent: input.intent } : {}),
+        outcome: input.outcome,
+        recentFindings: input.recentFindings,
+        sections,
+      };
+      const judgment = await this.request("focus", subject, state, questions);
+      lastJudgmentId = judgment.judgmentId;
+      if (judgment.status === "completed" && judgment.answers) {
+        completedCount++;
+        Object.assign(mergedAnswers, judgment.answers);
+      }
+    }
+
+    if (completedCount === 0) {
+      const decision = this.fallbackFocus(input.manifest);
+      this.recordDecision(
+        "focus",
+        { action: decision.mode, reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)] },
+        subject,
+        { judgmentId: lastJudgmentId },
+      );
+      return decision;
+    }
+
+    const inner = decideFocus(input.manifest, candidates, mergedAnswers, this.policy, input.budgetChars);
+    const status: FocusDecision["status"] = completedCount === batches.length ? "ok" : "partial";
+    const decision = assembleFocusDecision(input.manifest, inner, status, batches.length);
+    this.recordDecision(
+      "focus",
+      { action: decision.mode, reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)] },
       subject,
       { judgmentId: lastJudgmentId },
     );

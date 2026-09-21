@@ -102,3 +102,31 @@ export type {
   SelectReason,
   SelectDecision,
 } from "./selection";
+export {
+  splitIntoSections,
+  dependencyClosure,
+} from "./output-sections";
+export type {
+  OutputSection,
+  SectionManifest,
+} from "./output-sections";
+export {
+  FOCUS_MIN_CHARS,
+  FOCUS_BATCH_CHAR_BUDGET,
+  isExhaustiveTask,
+  encodeSectionId,
+  decodeSectionId,
+  buildFocusQuestions,
+  batchSections,
+  decideFocus,
+  decideFocusMode,
+  buildFallbackDecision as buildFocusFallbackDecision,
+  buildExhaustiveDecision,
+  assembleFocusDecision,
+} from "./output-focus";
+export type {
+  FocusMode,
+  FocusSectionReason,
+  FocusInput,
+  FocusDecision,
+} from "./output-focus";
