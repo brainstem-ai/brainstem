@@ -1,5 +1,5 @@
 import { Agent, type AgentTool, type StreamFn } from "@earendil-works/pi-agent-core";
-import type { Model, Api } from "@earendil-works/pi-ai";
+import type { Message, Model, Api } from "@earendil-works/pi-ai";
 import { dirname, join } from "node:path";
 import {
   ReflexEngine,
@@ -23,7 +23,11 @@ import {
   type ToolStatus,
   type TurnSpans,
 } from "@brainstem/core";
+import { buildActiveContext } from "./capabilities/context";
+import { makeDiscoveryTool } from "./capabilities/discovery";
 import { CapabilityRegistry } from "./capabilities/registry";
+import { SelectDriver } from "./capabilities/select-policy";
+import { loadSkillsFromRoot } from "./capabilities/skills";
 import { changeSummaryForWrite } from "./change-summary";
 import { isInside, resolveParentForWrite } from "./paths";
 import { SessionRecorder } from "./session";
@@ -45,6 +49,7 @@ export interface HarnessOptions {
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   approvalHandler?: ApprovalHandler;
   registry?: CapabilityRegistry;
+  skillRoots?: string[];
   pulseEveryTurns?: number;
   signal?: AbortSignal;
   onReflex?: (line: string) => void;
@@ -155,8 +160,32 @@ export function createHarness(options: HarnessOptions): Harness {
   }
 
   const artifactStore = new LocalArtifactStore(join(dirname(options.journalPath), "artifacts"));
-  const tools: AgentTool[] = [...makeTools({ cwd: options.cwd }), ...makeRecoveryTools({ store: artifactStore })];
   const registry = options.registry ?? new CapabilityRegistry();
+  const driver = new SelectDriver({ registry, engine, minRefreshIntervalMs: 0 });
+
+  const tools: AgentTool[] = [
+    ...makeTools({ cwd: options.cwd }),
+    ...makeRecoveryTools({ store: artifactStore }),
+    makeDiscoveryTool({
+      registry,
+      driver,
+      taskText,
+      recentActivity: () => summarizeMessages(agent?.state.messages ?? []),
+    }),
+  ];
+  for (const t of tools) registry.attachImpl(`tool:${t.name}`, t);
+
+  for (const root of options.skillRoots ?? []) {
+    for (const skill of loadSkillsFromRoot(root, [options.cwd, ...(options.skillRoots ?? [])])) {
+      registry.registerSkill(skill);
+    }
+  }
+
+  const initialWs = registry.workingSet();
+  const initialBuilt = buildActiveContext(registry, initialWs);
+  let appliedIdsKey = initialBuilt.activeIds.join(",");
+  let appliedInstructionHash: string | undefined = initialBuilt.instructionHash;
+  let lastTaskRevision = 0;
 
   // Capability descriptions are evidence for Steer only. Relevance never grants
   // execution permission, so this is read off the active set and nothing more.
@@ -353,7 +382,7 @@ export function createHarness(options: HarnessOptions): Harness {
     initialState: {
       systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
       model: options.model,
-      tools,
+      tools: initialBuilt.tools,
       thinkingLevel: options.thinkingLevel ?? "low",
     },
     streamFn: routedStreamFn,
@@ -388,6 +417,52 @@ export function createHarness(options: HarnessOptions): Harness {
         });
       }
       return false;
+    },
+    prepareNextTurnWithContext: async ({ context }) => {
+      const currentTask = recorder.currentTask;
+      const currentRevision = currentTask?.revision ?? 0;
+      if (currentRevision !== lastTaskRevision) {
+        await driver.refresh({ task: taskText(), recent: summarizeMessages(context.messages) }, { reason: "task_update" });
+        lastTaskRevision = currentRevision;
+      }
+
+      const decision = driver.currentDecision();
+      const ws = registry.workingSet({}, decision && { evaluated: decision.evaluated, recommended: decision.recommended });
+      const built = buildActiveContext(registry, ws);
+      const idsKey = built.activeIds.join(",");
+      if (idsKey === appliedIdsKey && built.instructionHash === appliedInstructionHash) {
+        return undefined;
+      }
+
+      journal.append({
+        t: "capability_set",
+        v: 2,
+        ts: Date.now(),
+        ...(currentTask ? { taskId: currentTask.id } : {}),
+        ...(recorder.currentTurnId ? { turnId: recorder.currentTurnId } : {}),
+        catalogHash: registry.catalogFingerprint(),
+        activeIds: built.activeIds,
+        ...(built.instructionHash !== undefined ? { instructionHash: built.instructionHash } : {}),
+      });
+
+      // Discovery-driven refresh happens inside a tool execute mid-turn and updates
+      // the driver's decision immediately, but this single integration point is
+      // where tool-set/skill-instruction changes reach the model — at the next
+      // turn boundary after the current assistant turn's remaining tool calls finish.
+      const result = {
+        context: {
+          messages:
+            built.instructionHash !== appliedInstructionHash && built.instructionBlock !== undefined
+              ? [...context.messages, { role: "system", content: built.instructionBlock, timestamp: Date.now() } as Message]
+              : context.messages,
+          tools: built.tools,
+        },
+      };
+
+      agent.state.tools = built.tools;
+      appliedIdsKey = idsKey;
+      appliedInstructionHash = built.instructionHash;
+      return result;
     },
     beforeToolCall: async ({ toolCall, args }, signal) => {
       const a = (args ?? {}) as { command?: string; path?: string };
@@ -645,6 +720,23 @@ export function createHarness(options: HarnessOptions): Harness {
       turnModelMs = 0;
       recorder.beginTurn();
       try {
+        // Initial capability selection for this task. Done here rather than before
+        // Agent construction because the objective is only known at prompt time.
+        const initialDecision = await driver.refresh({ task: taskText(), recent: [] }, { reason: "initial" });
+        const refreshedWs = registry.workingSet(
+          {},
+          initialDecision && { evaluated: initialDecision.evaluated, recommended: initialDecision.recommended },
+        );
+        const refreshedBuilt = buildActiveContext(registry, refreshedWs);
+        agent.state.tools = refreshedBuilt.tools;
+        if (refreshedBuilt.instructionBlock !== undefined) {
+          const skillMessage: Message = { role: "system", content: refreshedBuilt.instructionBlock, timestamp: Date.now() };
+          agent.state.messages = [...agent.state.messages, skillMessage];
+        }
+        appliedIdsKey = refreshedBuilt.activeIds.join(",");
+        appliedInstructionHash = refreshedBuilt.instructionHash;
+        lastTaskRevision = recorder.currentTask?.revision ?? 0;
+
         await agent.prompt(text);
       } finally {
         const spans: TurnSpans = {};

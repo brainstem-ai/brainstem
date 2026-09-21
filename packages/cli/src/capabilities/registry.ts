@@ -26,6 +26,7 @@ export interface RegisterInput {
 
 export const BASELINE_TOOL_IDS = [
   "tool:bash",
+  "tool:find_capabilities",
   "tool:read",
   "tool:write",
   "tool:grep",
@@ -54,6 +55,16 @@ const BASELINE_TOOLS: RegisterInput[] = [
     avoidWhen: ["A dedicated read or write tool covers the task"],
     alwaysAvailable: true,
     schema: { name: "bash", description: "Run a shell command in the project directory and return its output." },
+  },
+  {
+    id: "tool:find_capabilities",
+    kind: "tool",
+    version: "1.0.0",
+    description: "Search the capability catalog for optional tools or skills that match a query.",
+    useWhen: ["You need a capability that is not currently active"],
+    avoidWhen: ["The currently active tools already cover the task"],
+    alwaysAvailable: true,
+    schema: { name: "find_capabilities", description: "Search the capability catalog for optional tools or skills that match a query." },
   },
   {
     id: "tool:read",
@@ -122,6 +133,8 @@ export class CapabilityRegistry {
   #impls = new Map<string, unknown>();
   #configuredAvailability = new Map<string, boolean>();
   #explicit: string[] = [];
+  #skillInstructions = new Map<string, string>();
+  #pinned = new Set<string>();
 
   constructor() {
     for (const tool of BASELINE_TOOLS) this.register(tool, null);
@@ -135,8 +148,44 @@ export class CapabilityRegistry {
     this.#impls.set(input.id, impl);
   }
 
+  registerSkill(loaded: { descriptor: CapabilityDescriptor; instructions: string }): void {
+    this.register(loaded.descriptor as RegisterInput, null);
+    this.#skillInstructions.set(loaded.descriptor.id, loaded.instructions);
+  }
+
   impl(id: string): unknown {
     return this.#impls.get(id);
+  }
+
+  attachImpl(id: string, impl: unknown): void {
+    if (!this.#inputs.has(id)) {
+      throw new Error(`cannot attach impl to unknown capability: "${id}"`);
+    }
+    if (this.#impls.get(id) !== null) {
+      throw new Error(`capability already has an impl attached: "${id}"`);
+    }
+    this.#impls.set(id, impl);
+  }
+
+  instructionsFor(id: string): string | undefined {
+    return this.#skillInstructions.get(id);
+  }
+
+  pin(ids: string[]): void {
+    for (const id of ids) {
+      if (!this.#inputs.has(id)) {
+        throw new Error(`cannot pin unknown capability: "${id}"`);
+      }
+      this.#pinned.add(id);
+    }
+  }
+
+  unpin(ids: string[]): void {
+    for (const id of ids) this.#pinned.delete(id);
+  }
+
+  pinnedIds(): string[] {
+    return [...this.#pinned];
   }
 
   markAvailability(id: string, available: boolean): void {
@@ -182,6 +231,10 @@ export class CapabilityRegistry {
     opts: ComputeActiveOpts = {},
     selected?: { evaluated: CapabilityBitmap; recommended: CapabilityBitmap },
   ): WorkingSet {
+    const mergedOpts: ComputeActiveOpts = {
+      ...opts,
+      pinned: [...new Set([...(opts.pinned ?? []), ...this.pinnedIds()])],
+    };
     const catalog = this.snapshot();
     const availableIds = catalog.entries
       .filter((d) => d.alwaysAvailable || this.#configuredAvailability.get(d.id) !== false)
@@ -200,7 +253,7 @@ export class CapabilityRegistry {
       ? validateSelectedMask(catalog, selected.recommended, "recommended")
       : createBitmap(catalog.catalogHash, catalog.entries.length);
     const masks = { available, baseline, explicit, evaluated, recommended };
-    const active = computeActive(catalog, masks, opts).active;
+    const active = computeActive(catalog, masks, mergedOpts).active;
     return { ...masks, active };
   }
 

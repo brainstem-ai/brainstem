@@ -98,4 +98,54 @@ describe("CapabilityRegistry", () => {
       registry.register({ id: "tool:bash", kind: "tool", version: "1", description: "dup" }, null),
     ).toThrow(/already registered/);
   });
+
+  test("attachImpl throws on unknown id, double attach, and is visible via impl", () => {
+    const registry = new CapabilityRegistry();
+    expect(() => registry.attachImpl("tool:nope", { run: () => "" })).toThrow(/unknown capability/);
+    registry.attachImpl("tool:bash", { run: () => "" });
+    expect(() => registry.attachImpl("tool:bash", { run: () => "" })).toThrow(/already has an impl/);
+    expect(registry.impl("tool:bash")).toEqual({ run: expect.any(Function) });
+  });
+
+  test("registerSkill stores instructions and descriptor", () => {
+    const registry = new CapabilityRegistry();
+    registry.registerSkill({
+      descriptor: {
+        id: "skill:test",
+        kind: "skill",
+        version: "1.0.0",
+        description: "A test skill.",
+        useWhen: [],
+        avoidWhen: [],
+        requires: [],
+        alwaysAvailable: false,
+        contentHash: "abc",
+      },
+      instructions: "Do the thing.",
+    });
+    expect(registry.instructionsFor("skill:test")).toBe("Do the thing.");
+    expect(registry.impl("skill:test")).toBeNull();
+  });
+
+  test("pin/unpin/pinnedIds round-trip and unknown id throws", () => {
+    const registry = new CapabilityRegistry();
+    registry.pin(["tool:read"]);
+    expect(registry.pinnedIds()).toEqual(["tool:read"]);
+    registry.pin(["tool:write"]);
+    expect(registry.pinnedIds().sort()).toEqual(["tool:read", "tool:write"]);
+    registry.unpin(["tool:read"]);
+    expect(registry.pinnedIds()).toEqual(["tool:write"]);
+    expect(() => registry.pin(["tool:nope"])).toThrow(/unknown capability/);
+  });
+
+  test("workingSet merges registry pins into computeActive opts", () => {
+    const registry = new CapabilityRegistry();
+    registry.register(
+      { id: "skill:extra", kind: "skill", version: "1", description: "extra", alwaysAvailable: false },
+      null,
+    );
+    registry.pin(["skill:extra"]);
+    const ws = registry.workingSet();
+    expect(toIds(ws.active, registry.snapshot().entries)).toContain("skill:extra");
+  });
 });

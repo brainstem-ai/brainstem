@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { createInterface } from "node:readline";
+import { statSync } from "node:fs";
 import { createModels } from "@earendil-works/pi-ai";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { DEFAULT_TRUST, jevSystemOne, loadJournal, policyForTrust, type ApprovalHandler, type ApprovalRequest, type ApprovalResolution } from "@brainstem/core";
@@ -14,6 +15,7 @@ interface Args {
   journal: string;
   task?: string;
   cwd: string;
+  skillRoots: string[];
   help: boolean;
 }
 
@@ -33,6 +35,7 @@ function parseArgs(argv: string[]): Args {
     miniModel: "zai/glm-5.3-flash",
     journal: `~/.brainstem/journal-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.ndjson`,
     cwd: process.cwd(),
+    skillRoots: [],
     help: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -43,6 +46,10 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--journal") args.journal = argv[++i] ?? args.journal;
     else if (a === "--task") args.task = argv[++i];
     else if (a === "--cwd") args.cwd = argv[++i] ?? args.cwd;
+    else if (a === "--skill-root") {
+      const root = argv[++i];
+      if (root) args.skillRoots.push(root);
+    }
     else if (a === "--help" || a === "-h") args.help = true;
   }
   return args;
@@ -93,13 +100,14 @@ async function main() {
 
 Usage:
   brainstem [--trust 0..1] [--model provider/id] [--mini-model provider/id]
-            [--journal path] [--task "..."] [--cwd path]
+            [--journal path] [--task "..."] [--cwd path] [--skill-root path]
   brainstem replay <journal.ndjson> [--trust 0..1]
 
   --trust N        confidence bar for auto-running (0 = most cautious, 1 = most autonomous; default 0.3). Safety thresholds never change.
   --mini-model id  smaller model for steer routing (default zai/glm-5.3-flash)
   --task "..."     one-shot mode: run a single task and exit
   --journal p      NDJSON journal path (reflex answers, decisions, tool calls)
+  --skill-root p   directory containing skill subdirectories (repeatable)
   replay           re-score a recorded journal against a new trust level (no API calls)`);
     return;
   }
@@ -133,6 +141,21 @@ Usage:
     process.exit(1);
   }
   const { main: model, mini: miniModel } = resolved;
+
+  for (const root of args.skillRoots) {
+    const resolvedRoot = expandHome(root);
+    let stats;
+    try {
+      stats = statSync(resolvedRoot);
+    } catch {
+      console.error(`--skill-root does not exist: ${resolvedRoot}`);
+      process.exit(1);
+    }
+    if (!stats.isDirectory()) {
+      console.error(`--skill-root is not a directory: ${resolvedRoot}`);
+      process.exit(1);
+    }
+  }
 
   const journalPath = expandHome(args.journal);
   const systemOne = jevSystemOne(new TypeSafeClient());
@@ -170,6 +193,7 @@ Usage:
     trust: args.trust,
     journalPath,
     cwd: args.cwd,
+    skillRoots: args.skillRoots.map(expandHome),
     approvalHandler: args.task ? undefined : approvalHandler,
     onReflex: (line) => console.error(renderReflex(line)),
     onDelta: (delta) => process.stdout.write(delta),

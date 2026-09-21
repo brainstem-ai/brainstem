@@ -5,8 +5,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
-import type { AgentTool, StreamFn } from "@earendil-works/pi-agent-core";
+import type { AgentLoopTurnUpdate, AgentTool, StreamFn } from "@earendil-works/pi-agent-core";
 import { mockSystemOne, choiceAnswer, noulAnswer, scoreAnswer, type Answer } from "@brainstem/core";
+import { CapabilityRegistry } from "../src/capabilities/registry";
 import { createHarness, DEFAULT_SYSTEM_PROMPT } from "../src/harness";
 
 type Ctx = Parameters<StreamFn>[1];
@@ -158,8 +159,8 @@ describe("runtime contract", () => {
     expect(first.role).toBe("system");
     const text = typeof first.content === "string" ? first.content : first.content.map((c) => c.text).join("\n");
     expect(text).toContain(DEFAULT_SYSTEM_PROMPT);
-    expect(first.toolsAdded?.map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "read_output", "search_output", "write"]);
-    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "read_output", "search_output", "write"]);
+    expect(first.toolsAdded?.map((t) => t.name).sort()).toEqual(["bash", "find_capabilities", "glob", "grep", "read", "read_output", "search_output", "write"]);
+    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "find_capabilities", "glob", "grep", "read", "read_output", "search_output", "write"]);
   });
 
   test("gate block in beforeToolCall prevents execute", async () => {
@@ -327,7 +328,7 @@ describe("runtime contract", () => {
     });
 
     await agent.prompt("run one");
-    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "read_output", "search_output", "write"]);
+    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "find_capabilities", "glob", "grep", "read", "read_output", "search_output", "write"]);
 
     setTextTools(agent.state, [spyTool(spyCalls)]);
     expect(asToolList(agent.state).map((t) => t.name)).toEqual(["spy"]);
@@ -458,5 +459,209 @@ describe("runtime contract", () => {
         2,
       ),
     );
+  });
+
+  test("skill activation appends instructions at a later turn boundary, preserving the first system message", async () => {
+    const cwd = newDir();
+    const registry = new CapabilityRegistry();
+    registry.registerSkill({
+      descriptor: {
+        id: "skill:verify",
+        kind: "skill",
+        version: "1.0.0",
+        description: "Always run make verify after changes.",
+        useWhen: [],
+        avoidWhen: [],
+        requires: [],
+        alwaysAvailable: false,
+        contentHash: "abc",
+      },
+      instructions: "After any change, run `make verify` and report the result.",
+    });
+
+    const gateOnlyAnswers = (): Record<string, Answer> => ({
+      destructive: scoreAnswer(0, 0.9),
+      touches_credentials: noulAnswer(0.03),
+      exfiltrates: noulAnswer(0.02),
+      on_task: noulAnswer(0.95),
+      disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
+    });
+
+    let selectCalls = 0;
+    const mock = mockSystemOne((_state, questions): Record<string, Answer> => {
+      if ("select__skill_verify" in questions) {
+        selectCalls += 1;
+        return { "select__skill_verify": noulAnswer(selectCalls === 2 ? 0.95 : 0.05) };
+      }
+      if ("disposition" in questions) return gateOnlyAnswers();
+      return safeGate();
+    });
+
+    const { agent, recorder, prompt } = createHarness({
+      systemOne: mock,
+      streamFn: recordingStream(
+        (call) => {
+          if (call === 1) return [assistantMessage([{ type: "toolCall", id: "tc1", name: "bash", arguments: { command: "echo step1" } }], "toolUse")];
+          if (call === 2) {
+            recorder.updateTask("now verify");
+            return [assistantMessage([{ type: "toolCall", id: "tc2", name: "bash", arguments: { command: "echo step2" } }], "toolUse")];
+          }
+          return [assistantMessage([{ type: "text", text: "done" }], "stop")];
+        },
+        [],
+      ),
+      model: undefined as never,
+      trust: 0.3,
+      journalPath: join(cwd, "journal.ndjson"),
+      cwd,
+      registry,
+    });
+
+    const original = agent.prepareNextTurnWithContext;
+    const prepareCalls: (AgentLoopTurnUpdate | undefined)[] = [];
+    agent.prepareNextTurnWithContext = async (ctx, signal) => {
+      const result = await original?.(ctx, signal);
+      prepareCalls.push(result);
+      return result;
+    };
+
+    await prompt("do work");
+
+    expect(stateMessages(agent.state)[0]).toMatchObject({
+      role: "system",
+      content: expect.stringContaining(DEFAULT_SYSTEM_PROMPT),
+    });
+
+    expect(prepareCalls.length).toBeGreaterThanOrEqual(2);
+    expect(prepareCalls[0]).toBeUndefined();
+
+    const second = prepareCalls[1];
+    expect(second).toBeDefined();
+    const messages = stateMessages({ messages: second!.context?.messages ?? [] });
+    const skillMessage = messages.find(
+      (m) => m.role === "system" && typeof m.content === "string" && m.content.includes("make verify"),
+    );
+    expect(skillMessage).toBeDefined();
+    expect(skillMessage).not.toBe(messages[0]);
+  });
+
+  test("no task revision change and no discovery keeps prepareNextTurnWithContext returning undefined", async () => {
+    const cwd = newDir();
+    const out: Ctx[] = [];
+    const gateOnlyAnswers = (): Record<string, Answer> => ({
+      destructive: scoreAnswer(0, 0.9),
+      touches_credentials: noulAnswer(0.03),
+      exfiltrates: noulAnswer(0.02),
+      on_task: noulAnswer(0.95),
+      disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
+    });
+    const mock = mockSystemOne((_state, questions): Record<string, Answer> => {
+      if ("disposition" in questions) return gateOnlyAnswers();
+      return safeGate();
+    });
+
+    const stream = scriptedStream([
+      assistantMessage([{ type: "toolCall", id: "tc1", name: "bash", arguments: { command: "echo a" } }], "toolUse"),
+      assistantMessage([{ type: "toolCall", id: "tc2", name: "bash", arguments: { command: "echo b" } }], "toolUse"),
+      assistantMessage([{ type: "text", text: "done" }], "stop"),
+    ]);
+
+    const { agent, prompt } = createHarness({
+      systemOne: mock,
+      streamFn: (model, context, opts) => {
+        out.push(context);
+        return stream(model, context, opts);
+      },
+      model: undefined as never,
+      trust: 0.3,
+      journalPath: join(cwd, "journal.ndjson"),
+      cwd,
+    });
+
+    const original = agent.prepareNextTurnWithContext;
+    let callCount = 0;
+    agent.prepareNextTurnWithContext = async (ctx, signal) => {
+      callCount += 1;
+      return original?.(ctx, signal);
+    };
+
+    await prompt("run two steps");
+
+    expect(callCount).toBe(2);
+  });
+
+  test("releasing a discovered pin removes the capability from tools at the next boundary", async () => {
+    const cwd = newDir();
+    const registry = new CapabilityRegistry();
+    const spyCalls: unknown[] = [];
+    registry.register(
+      {
+        id: "tool:spy",
+        kind: "tool",
+        version: "1.0.0",
+        description: "A spy tool for testing discovery.",
+        useWhen: [],
+        avoidWhen: [],
+        alwaysAvailable: false,
+      },
+      null,
+    );
+    registry.attachImpl("tool:spy", spyTool(spyCalls));
+
+    const gateOnlyAnswers = (): Record<string, Answer> => ({
+      destructive: scoreAnswer(0, 0.9),
+      touches_credentials: noulAnswer(0.03),
+      exfiltrates: noulAnswer(0.02),
+      on_task: noulAnswer(0.95),
+      disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
+    });
+
+    const mock = mockSystemOne((_state, questions): Record<string, Answer> => {
+      if ("select__tool_spy" in questions) {
+        return { "select__tool_spy": noulAnswer(0.95) };
+      }
+      if ("disposition" in questions) return gateOnlyAnswers();
+      return safeGate();
+    });
+
+    const { agent, prompt } = createHarness({
+      systemOne: mock,
+      streamFn: recordingStream(
+        (call) => {
+          if (call === 1) {
+            return [
+              assistantMessage(
+                [{ type: "toolCall", id: "tc1", name: "find_capabilities", arguments: { query: "spy" } }],
+                "toolUse",
+              ),
+            ];
+          }
+          if (call === 2) {
+            registry.unpin(["tool:spy"]);
+            return [assistantMessage([{ type: "toolCall", id: "tc2", name: "bash", arguments: { command: "echo done" } }], "toolUse")];
+          }
+          return [assistantMessage([{ type: "text", text: "done" }], "stop")];
+        },
+        [],
+      ),
+      model: undefined as never,
+      trust: 0.3,
+      journalPath: join(cwd, "journal.ndjson"),
+      cwd,
+      registry,
+    });
+
+    await prompt("find and drop spy");
+
+    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual([
+      "bash",
+      "find_capabilities",
+      "glob",
+      "grep",
+      "read",
+      "read_output",
+      "search_output",
+      "write",
+    ]);
   });
 });
