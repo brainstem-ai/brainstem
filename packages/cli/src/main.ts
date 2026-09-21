@@ -5,6 +5,7 @@ import { createModels } from "@earendil-works/pi-ai";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { DEFAULT_TRUST, jevSystemOne, loadJournal, policyForTrust, type ApprovalHandler, type ApprovalRequest, type ApprovalResolution } from "@brainstem/core";
 import { createHarness } from "./harness";
+import type { FocusRolloutMode } from "./output/present";
 import { resolveModels, type ResolvedModels } from "./models";
 import { replayJournal } from "./replay";
 
@@ -16,8 +17,11 @@ interface Args {
   task?: string;
   cwd: string;
   skillRoots: string[];
+  focusMode: FocusRolloutMode;
   help: boolean;
 }
+
+const FOCUS_MODES: readonly FocusRolloutMode[] = ["off", "shadow", "on"];
 
 const DIM = "\x1b[2m";
 const RED = "\x1b[31m";
@@ -36,6 +40,7 @@ function parseArgs(argv: string[]): Args {
     journal: `~/.brainstem/journal-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.ndjson`,
     cwd: process.cwd(),
     skillRoots: [],
+    focusMode: "off",
     help: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -50,6 +55,7 @@ function parseArgs(argv: string[]): Args {
       const root = argv[++i];
       if (root) args.skillRoots.push(root);
     }
+    else if (a === "--focus-mode") args.focusMode = (argv[++i] ?? args.focusMode) as FocusRolloutMode;
     else if (a === "--help" || a === "-h") args.help = true;
   }
   return args;
@@ -108,12 +114,17 @@ Usage:
   --task "..."     one-shot mode: run a single task and exit
   --journal p      NDJSON journal path (reflex answers, decisions, tool calls)
   --skill-root p   directory containing skill subdirectories (repeatable)
+  --focus-mode m   off (default), shadow (compute + journal, never presented), or on (presented)
   replay           re-score a recorded journal against a new trust level (no API calls)`);
     return;
   }
 
   if (!Number.isFinite(args.trust) || args.trust < 0 || args.trust > 1) {
     console.error(`--trust must be a number between 0 and 1, got ${args.trust}`);
+    process.exit(1);
+  }
+  if (!FOCUS_MODES.includes(args.focusMode)) {
+    console.error(`--focus-mode must be one of ${FOCUS_MODES.join("|")}, got ${args.focusMode}`);
     process.exit(1);
   }
   for (let i = 0; i < process.argv.length; i++) {
@@ -194,6 +205,7 @@ Usage:
     journalPath,
     cwd: args.cwd,
     skillRoots: args.skillRoots.map(expandHome),
+    focusMode: args.focusMode,
     approvalHandler: args.task ? undefined : approvalHandler,
     onReflex: (line) => console.error(renderReflex(line)),
     onDelta: (delta) => process.stdout.write(delta),

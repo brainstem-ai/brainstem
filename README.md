@@ -13,8 +13,7 @@ A coding-agent harness where Jev (TypeSafe's System One model) makes bounded jud
 
 ## Reflexes
 
-Implemented: **Gate**, **Sanitize**, **Verify**, **Pulse**, **Steer**
-Planned: **Select**, **Focus**
+Implemented: **Gate**, **Sanitize**, **Verify**, **Pulse**, **Steer**, **Select**, **Focus**
 
 **Tend** is a later checkpoint workflow, not a continuous filter.
 
@@ -23,9 +22,11 @@ What each reflex is shown is as much a part of the contract as what it decides:
 | Reflex | Evidence it receives |
 |---|---|
 | Gate | The real action — the command, or for a write a bounded diff (existing file) or first-40-lines summary (new file), flagged when the evidence is incomplete. The approval hash stays out of it. |
-| Sanitize / Verify | One bounded envelope: task, source, action summary, capped intent, status, truncation, and the exact content to be delivered. |
+| Sanitize / Verify | One bounded envelope: task, source, action summary, capped intent, status, truncation, and the exact content actually delivered — never a second independent slice of the raw capture. |
 | Pulse | Recent actions with statuses, labelled repeat counts, failure fingerprints, and whether the approach changed — all computed in code. |
 | Steer | The latest completed observation and the active capability descriptions. |
+| Select | One independent relevance judgment per optional catalog capability, batched by size; code always includes baseline and explicit selections. |
+| Focus | One independent relevance judgment per structural output section (paragraphs, header/child groups, or line windows), with a dependency closure and a byte budget. Off by default — see below. |
 
 Literal facts are never delegated: containment, counts, durations, exit codes and
 budgets are computed in code. A write resolving outside the project root skips
@@ -72,6 +73,23 @@ Responses carry their real source ranges and completeness markers, and pass
 through the same sanitize path as any other tool result. Unknown ID, evicted
 artifact, capture truncation, and empty source are distinct outcomes — never a
 bare "no output". The store is bounded per session and evicts by age.
+
+## Focus rollout
+
+`--focus-mode off|shadow|on` (default `off`) controls whether Focus's section
+selection ever shapes what the model sees:
+
+- `off` — the artifact's bounded view is the first 10 lines plus a recovery
+  notice, same as always. No Focus judgment runs.
+- `shadow` — Focus runs and its decision is journaled (mode, status, section
+  manifest hash), but the presented view is unchanged from `off`. Use this to
+  evaluate selection quality and cost before trusting it to shape output.
+- `on` — a `"select"` decision presents only the relevant sections plus a
+  coverage receipt (`showing K of N sections... use read_output or
+  search_output to recover the rest`); a `"full"` or `"compute_or_retrieve"`
+  decision falls back to the bounded view. Internal scores never appear in
+  presented text. Sanitize always judges the exact bounded view the model
+  will see, never a separate slice of the raw capture.
 
 ## Replay
 

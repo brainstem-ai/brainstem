@@ -5,19 +5,21 @@ import {
   ReflexEngine,
   contentHash,
   countLines,
+  splitIntoSections,
   toIds,
   hashAction,
   newId,
   openJournal,
   policyForTrust,
-  sliceByLines,
   staticVerdict,
   type ApprovalHandler,
   type ApprovalRequest,
   type ApprovalResolution,
   type ApprovalStatus,
   type ArtifactRecord,
+  type FocusDecision,
   type Journal,
+  type SectionManifest,
   type SystemOne,
   type ToolObservation,
   type ToolStatus,
@@ -33,6 +35,7 @@ import { isInside, resolveParentForWrite } from "./paths";
 import { SessionRecorder } from "./session";
 import { makeTools } from "./tools";
 import { LocalArtifactStore } from "./output/artifact-store";
+import { FOCUS_PRESENT_BUDGET_CHARS, presentArtifact, type FocusRolloutMode } from "./output/present";
 import { makeRecoveryTools } from "./output/recovery-tools";
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a careful coding agent. Work inside the project directory. Prefer small, verifiable steps: run tests, read before writing, and keep the user informed. If a tool result says the harness blocked or flagged something, surface that to the user in your reply.`;
@@ -50,6 +53,7 @@ export interface HarnessOptions {
   approvalHandler?: ApprovalHandler;
   registry?: CapabilityRegistry;
   skillRoots?: string[];
+  focusMode?: FocusRolloutMode;
   pulseEveryTurns?: number;
   signal?: AbortSignal;
   onReflex?: (line: string) => void;
@@ -69,9 +73,6 @@ export interface Harness {
 
 const EXCERPT_CAP = 2_000;
 const STEER_CAPABILITY_CAP = 12;
-// The model sees at most this many lines of a capture; the full output lives in
-// the artifact store, recoverable via read_output/search_output.
-const PRESENTED_LINE_CAP = 10;
 const CAPTURED_TOOLS = new Set(["bash", "read", "write", "grep", "glob"]);
 const RECOVERY_TOOLS = new Set(["read_output", "search_output"]);
 
@@ -580,24 +581,47 @@ export function createHarness(options: HarnessOptions): Harness {
       };
       recorder.recordAction(hashAction({ tool: obs.tool, args: obs.argsSummary }), actionLabel(obs.tool, obs.argsSummary));
 
-      let baseView = obs.excerpt;
-      let deliveredTruncated = obs.truncated;
-      let deliveredWhy: string | undefined;
+      // Shared by both Focus and sanitize/verify below — one bounded intent
+      // string, not two independently-phrased ones.
+      const intent = `${toolCall.name} ${JSON.stringify(toolCall.arguments)}`;
 
-      if (artifact) {
-        const slice = sliceByLines(fullText, 1, PRESENTED_LINE_CAP);
-        if (slice.totalLines > PRESENTED_LINE_CAP) {
-          baseView = `${slice.text}\n[brainstem] capture archived as artifact ${artifact.artifactId}; showing lines 1-${PRESENTED_LINE_CAP} of ${slice.totalLines} — use read_output or search_output to recover the omitted lines.`;
-          deliveredTruncated = true;
-        } else {
-          baseView = fullText;
-        }
+      let manifest: SectionManifest | undefined;
+      let focusDecision: FocusDecision | undefined;
+      const focusRollout: FocusRolloutMode = options.focusMode ?? "off";
+      if (artifact && focusRollout !== "off") {
+        manifest = splitIntoSections(artifact.artifactId, fullText);
+        focusDecision = await timedJev(() =>
+          engine.focus({
+            task: taskText(),
+            command: actionLabel(toolCall.name, toolCall.arguments),
+            intent,
+            outcome: obs.status,
+            recentFindings: recorder.recentActivity(5),
+            manifest: manifest!,
+            budgetChars: FOCUS_PRESENT_BUDGET_CHARS,
+          }),
+        );
+        options.onReflex?.(render("focus", focusDecision.mode, focusDecision.reasons));
       }
+
+      const view = artifact
+        ? presentArtifact(fullText, artifact.artifactId, {
+            // "shadow" computes and journals the decision above but never shapes
+            // what is shown — only "on" does. This is the one place that
+            // distinction is enforced.
+            rollout: focusRollout === "on" ? "on" : "off",
+            manifest,
+            decision: focusDecision,
+          })
+        : { text: obs.excerpt, truncated: obs.truncated };
+
+      let baseView = view.text;
+      let deliveredTruncated = view.truncated;
+      let deliveredWhy: string | undefined;
 
       let deliveredExcerpt = baseView;
 
       if (!isError && fullText.trim()) {
-        const intent = `${toolCall.name} ${JSON.stringify(toolCall.arguments)}`;
         const observed = await timedJev(() =>
           engine.observeToolResult({
             task: taskText(),
@@ -606,7 +630,10 @@ export function createHarness(options: HarnessOptions): Harness {
             intent,
             status: obs.status,
             truncated: obs.truncated,
-            content: fullText.slice(0, 8000),
+            // The exact bounded view the model will see, never a second
+            // independent slice of the raw capture — sanitize must not judge
+            // content the agent was never shown.
+            content: baseView.slice(0, 8000),
           }),
         );
         options.onReflex?.(render("sanitize", observed.sanitize.action, observed.sanitize.reasons));
@@ -652,6 +679,14 @@ export function createHarness(options: HarnessOptions): Harness {
           captureComplete: artifact.captureComplete,
           byteCount: artifact.byteCount,
           presentedViewHash: contentHash(deliveredExcerpt),
+          ...(manifest !== undefined ? { sectionManifestHash: manifest.catalogHash } : {}),
+          ...(focusDecision !== undefined
+            ? {
+                focusRollout: (focusRollout === "on" ? "on" : "shadow") as "on" | "shadow",
+                focusMode: focusDecision.mode,
+                focusStatus: focusDecision.status,
+              }
+            : {}),
         });
       }
 
