@@ -80,7 +80,7 @@ Each row is a reviewable implementation unit. Update this checklist as work land
 | F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 | Landed |
 | F2 | Focus integration and controlled rollout | P8, F1 | Landed |
 | P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 | Replay landed; evaluation tooling not started |
-| P10 | Measured caching, batching, and journal improvements | P9 | Not started |
+| P10 | Measured caching, batching, and journal improvements | P9 | Cache + dedup landed; batching, fusion, journal sink, prefetch, seeding not started |
 | P11 | Tend: deliberate provider-aware compaction checkpoints | P8, F2, P9; experimental | Not started |
 
 Select (P7) turns Jev judgments into `evaluated`/`recommended` bitmaps, and P8
