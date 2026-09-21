@@ -85,6 +85,10 @@ export const CONTINUING_LEVELS: [string, string, string] = [
   "Continue autonomously.",
 ];
 
+export function sanitizeVerifyGroups(): Record<string, string[]> {
+  return { sanitize: Object.keys(sanitizeQuestions()), verify: Object.keys(verifyQuestions()) };
+}
+
 export function verifyQuestions(): Record<string, Question> {
   return {
     satisfies_intent: noul(

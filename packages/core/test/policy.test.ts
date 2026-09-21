@@ -19,6 +19,10 @@ describe("policyForTrust", () => {
     expect(p.pulse.progressNoul).toBe(0.3);
     expect(p.pulse.stopScore).toBe(0.5);
     expect(p.steer.miniConfidence).toBe(0.6);
+    expect(p.jev.deadlineMs).toBe(1500);
+    expect(p.jev.retries).toBe(0);
+    expect(p.jev.breaker).toEqual({ threshold: 3, cooldownMs: 10000, probe: 1 });
+    expect(p.budgets).toEqual({});
   });
 
   test("higher trust lowers the auto-run confidence bar monotonically", () => {

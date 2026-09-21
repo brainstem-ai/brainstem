@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { choiceAnswer, mockSystemOne, noulAnswer, scoreAnswer } from "../src/providers/mock";
-import { jevSystemOne } from "../src/providers/jev";
+import { jevSystemOne, withCircuitBreaker } from "../src/providers/jev";
+import { JevCancelledError, JevUnavailableError } from "../src/errors";
+import { CircuitBreaker } from "../src/circuit-breaker";
 import type { Question } from "../src/types";
 
 const questions: Record<string, Question> = {
@@ -105,6 +107,89 @@ describe("jev provider", () => {
       state: { task: "x" },
       questions: { safe: questions.safe },
       model: "jev-1.13.0",
+      signal: expect.any(AbortSignal),
     });
+  });
+
+  test("hanging SDK call past the deadline rejects cancelled", async () => {
+    const hangingClient = {
+      systemOne: () => new Promise<never>(() => {}),
+    };
+    const provider = jevSystemOne(hangingClient as never);
+    await expect(provider.ask({}, questions, { deadlineMs: 20 })).rejects.toBeInstanceOf(JevCancelledError);
+  });
+
+  test("signal aborted mid-call maps to cancelled", async () => {
+    const hangingClient = {
+      systemOne: () => new Promise<never>(() => {}),
+    };
+    const provider = jevSystemOne(hangingClient as never);
+    const controller = new AbortController();
+    const pending = provider.ask({}, questions, { signal: controller.signal });
+    setTimeout(() => controller.abort(), 5);
+    await expect(pending).rejects.toBeInstanceOf(JevCancelledError);
+  });
+
+  test("an already-aborted signal rejects before any call", async () => {
+    const seen: unknown[] = [];
+    const client = {
+      systemOne: async (req: unknown) => {
+        seen.push(req);
+        return { model: "m", usage: { input_tokens: 0, output_tokens: 0 }, answers: {} };
+      },
+    };
+    const provider = jevSystemOne(client as never);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(provider.ask({}, questions, { signal: controller.signal })).rejects.toBeInstanceOf(JevCancelledError);
+    expect(seen).toHaveLength(0);
+  });
+
+  test("SDK failure maps to unavailable, not cancelled", async () => {
+    const client = {
+      systemOne: async () => {
+        throw new Error("boom");
+      },
+    };
+    const provider = jevSystemOne(client as never);
+    await expect(provider.ask({}, questions)).rejects.toBeInstanceOf(JevUnavailableError);
+    await expect(provider.ask({}, questions)).rejects.toThrow("boom");
+  });
+});
+
+describe("mock helpers", () => {
+  test("failing rejects unavailable with the scripted reason", async () => {
+    await expect(mockSystemOne.failing("provider down").ask({}, {})).rejects.toThrow("provider down");
+  });
+
+  test("hanging never settles without a deadline but rejects cancelled when it fires", async () => {
+    const hanging = mockSystemOne.hanging();
+    let settled = false;
+    hanging.ask({}, {}).then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    await new Promise((r) => setTimeout(r, 15));
+    expect(settled).toBe(false);
+
+    const withDeadline = mockSystemOne.hanging();
+    await expect(withDeadline.ask({}, {}, { deadlineMs: 10 })).rejects.toBeInstanceOf(JevCancelledError);
+  });
+
+  test("hanging honors an abort signal", async () => {
+    const controller = new AbortController();
+    const pending = mockSystemOne.hanging().ask({}, {}, { signal: controller.signal });
+    setTimeout(() => controller.abort(), 5);
+    await expect(pending).rejects.toBeInstanceOf(JevCancelledError);
+  });
+
+  test("withCircuitBreaker decorates through to the provider", async () => {
+    const breaker = new CircuitBreaker({ threshold: 3, cooldownMs: 10000, probe: 1 });
+    const mock = mockSystemOne(() => ({ safe: noulAnswer(0.5) }));
+    const provider = withCircuitBreaker(mock, breaker);
+    const result = await provider.ask({ task: "x" }, { safe: questions.safe! });
+    expect(result.answers.safe).toEqual({ type: "noul", noul: 0.5 });
+    expect(mock.calls).toHaveLength(1);
+    expect(breaker.open).toBe(false);
   });
 });
