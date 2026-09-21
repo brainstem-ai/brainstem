@@ -1,16 +1,21 @@
 import { Agent, type AgentTool, type StreamFn } from "@earendil-works/pi-agent-core";
 import type { Model, Api } from "@earendil-works/pi-ai";
+import { dirname, join } from "node:path";
 import {
   ReflexEngine,
+  contentHash,
+  countLines,
   hashAction,
   newId,
   openJournal,
   policyForTrust,
+  sliceByLines,
   staticVerdict,
   type ApprovalHandler,
   type ApprovalRequest,
   type ApprovalResolution,
   type ApprovalStatus,
+  type ArtifactRecord,
   type Journal,
   type SystemOne,
   type ToolObservation,
@@ -19,6 +24,8 @@ import {
 } from "@brainstem/core";
 import { SessionRecorder } from "./session";
 import { makeTools } from "./tools";
+import { LocalArtifactStore } from "./output/artifact-store";
+import { makeRecoveryTools } from "./output/recovery-tools";
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a careful coding agent. Work inside the project directory. Prefer small, verifiable steps: run tests, read before writing, and keep the user informed. If a tool result says the harness blocked or flagged something, surface that to the user in your reply.`;
 
@@ -51,6 +58,11 @@ export interface Harness {
 }
 
 const EXCERPT_CAP = 2_000;
+// The model sees at most this many lines of a capture; the full output lives in
+// the artifact store, recoverable via read_output/search_output.
+const PRESENTED_LINE_CAP = 10;
+const CAPTURED_TOOLS = new Set(["bash", "read", "write", "grep", "glob"]);
+const RECOVERY_TOOLS = new Set(["read_output", "search_output"]);
 
 function textOf(content: { type: string; text?: string }[]): string {
   return content
@@ -64,6 +76,8 @@ interface ToolDetails {
   exit?: number;
   durationMs?: number;
   truncated?: boolean;
+  stdoutBytes?: number;
+  stderrBytes?: number;
 }
 
 function detailsOf(result: unknown): ToolDetails {
@@ -128,7 +142,8 @@ export function createHarness(options: HarnessOptions): Harness {
     return { block: true, reason: `[brainstem] ${reason} Ask the user to confirm, and re-run only if they approve.` };
   }
 
-  const tools: AgentTool[] = makeTools({ cwd: options.cwd });
+  const artifactStore = new LocalArtifactStore(join(dirname(options.journalPath), "artifacts"));
+  const tools: AgentTool[] = [...makeTools({ cwd: options.cwd }), ...makeRecoveryTools({ store: artifactStore })];
 
   function textOfAny(content: unknown): string {
     if (typeof content === "string") return content;
@@ -383,6 +398,29 @@ export function createHarness(options: HarnessOptions): Harness {
       const fullText = textOf((result?.content ?? []) as { type: string; text?: string }[]);
       const details = detailsOf(result);
 
+      // Capture the full output before any sanitize override so the original
+      // bytes stay recoverable even when the presented view is blocked or bounded.
+      let artifact: ArtifactRecord | undefined;
+      if (!isError && fullText.length > 0 && CAPTURED_TOOLS.has(toolCall.name) && !RECOVERY_TOOLS.has(toolCall.name)) {
+        const args = (toolCall.arguments ?? {}) as { command?: string; path?: string; pattern?: string };
+        const record: ArtifactRecord = {
+          artifactId: newId("art"),
+          toolCallId,
+          tool: toolCall.name,
+          commandOrTarget: args.command ?? args.path ?? args.pattern ?? "",
+          contentHash: contentHash(fullText),
+          byteCount: Buffer.byteLength(fullText, "utf8"),
+          lineCount: countLines(fullText),
+          captureComplete: details.truncated !== true,
+          createdAt: Date.now(),
+        };
+        if (details.stdoutBytes !== undefined || details.stderrBytes !== undefined) {
+          record.streams = { stdoutBytes: details.stdoutBytes ?? 0, stderrBytes: details.stderrBytes ?? 0 };
+        }
+        artifactStore.put(record, fullText);
+        artifact = record;
+      }
+
       const obs: ToolObservation = {
         toolCallId,
         tool: toolCall.name,
@@ -395,9 +433,21 @@ export function createHarness(options: HarnessOptions): Harness {
       };
       recorder.recordAction(hashAction({ tool: obs.tool, args: obs.argsSummary }));
 
-      let deliveredExcerpt = obs.excerpt;
+      let baseView = obs.excerpt;
       let deliveredTruncated = obs.truncated;
       let deliveredWhy: string | undefined;
+
+      if (artifact) {
+        const slice = sliceByLines(fullText, 1, PRESENTED_LINE_CAP);
+        if (slice.totalLines > PRESENTED_LINE_CAP) {
+          baseView = `${slice.text}\n[brainstem] capture archived as artifact ${artifact.artifactId}; showing lines 1-${PRESENTED_LINE_CAP} of ${slice.totalLines} — use read_output or search_output to recover the omitted lines.`;
+          deliveredTruncated = true;
+        } else {
+          baseView = fullText;
+        }
+      }
+
+      let deliveredExcerpt = baseView;
 
       if (!isError && fullText.trim()) {
         const intent = `${toolCall.name} ${JSON.stringify(toolCall.arguments)}`;
@@ -431,16 +481,30 @@ export function createHarness(options: HarnessOptions): Harness {
             deliveredWhy ??= "verify unavailable notes prepended";
           }
           if (notes.length > 0) {
-            deliveredExcerpt = `${notes.join("\n")}\n\n${obs.excerpt}`;
+            deliveredExcerpt = `${notes.join("\n")}\n\n${baseView}`;
           }
         }
+      }
+
+      if (artifact) {
+        journal.append({
+          t: "artifacts",
+          v: 2,
+          artifactId: artifact.artifactId,
+          ts: Date.now(),
+          toolCallId,
+          contentHash: artifact.contentHash,
+          captureComplete: artifact.captureComplete,
+          byteCount: artifact.byteCount,
+          presentedViewHash: contentHash(deliveredExcerpt),
+        });
       }
 
       emitObservation(obs, deliveredExcerpt, deliveredTruncated, deliveredWhy);
 
       if (isError) return undefined;
       if (!fullText.trim()) return undefined;
-      if (deliveredExcerpt !== obs.excerpt) {
+      if (deliveredExcerpt !== fullText) {
         return { content: [{ type: "text", text: deliveredExcerpt }] };
       }
       return undefined;

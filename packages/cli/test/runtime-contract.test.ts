@@ -158,8 +158,8 @@ describe("runtime contract", () => {
     expect(first.role).toBe("system");
     const text = typeof first.content === "string" ? first.content : first.content.map((c) => c.text).join("\n");
     expect(text).toContain(DEFAULT_SYSTEM_PROMPT);
-    expect(first.toolsAdded?.map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "write"]);
-    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "write"]);
+    expect(first.toolsAdded?.map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "read_output", "search_output", "write"]);
+    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "read_output", "search_output", "write"]);
   });
 
   test("gate block in beforeToolCall prevents execute", async () => {
@@ -327,7 +327,7 @@ describe("runtime contract", () => {
     });
 
     await agent.prompt("run one");
-    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "write"]);
+    expect(asToolList(agent.state).map((t) => t.name).sort()).toEqual(["bash", "glob", "grep", "read", "read_output", "search_output", "write"]);
 
     setTextTools(agent.state, [spyTool(spyCalls)]);
     expect(asToolList(agent.state).map((t) => t.name)).toEqual(["spy"]);
