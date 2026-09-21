@@ -5,8 +5,8 @@
   "bin": { "brainstem": "./src/main.ts" },
   "dependencies": {
     "@brainstem/core": "file:../core",
-    "@earendil-works/pi-agent-core": "*",
-    "@earendil-works/pi-ai": "*",
-    "@sinclair/typebox": "*"
+    "@earendil-works/pi-agent-core": "0.86.1",
+    "@earendil-works/pi-ai": "0.86.1",
+    "@sinclair/typebox": "0.34.52"
   }
 }

@@ -1,3 +1,5 @@
+> Superseded as current direction by docs/plans/2026-09-20-harness-evolution.md — historical results below are preserved.
+
 # Brainstem — Dual-Brain Agent Harness Implementation Plan
 
 > Historical implementation record. The current proposed direction, including capability bitmaps and the evaluated Jev output-focus feature, is in [the consolidated harness evolution plan](2026-09-20-harness-evolution.md).

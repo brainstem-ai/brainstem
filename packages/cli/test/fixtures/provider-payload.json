@@ -1,0 +1,19 @@
+{
+  "messages": [
+    "system",
+    "user",
+    "assistant",
+    "toolResult",
+    "assistant",
+    "system",
+    "system",
+    "user"
+  ],
+  "toolPairing": [
+    {
+      "id": "tc1",
+      "name": "grep"
+    }
+  ],
+  "tools": "tools travel out-of-band; they are not part of the streamFn context"
+}
