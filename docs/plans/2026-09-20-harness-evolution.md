@@ -65,23 +65,28 @@ Keep the full chronological transcript, raw output artifacts, and provider-facin
 
 Each row is a reviewable implementation unit. Update this checklist as work lands.
 
-| ID | Work | Depends on |
-|---|---|---|
-| P0 | Product documentation and runtime contract tests | — |
-| P1 | Reliable tools, paths, and model resolution | P0 |
-| P2 | Session evidence and journal schema v2 | P1 |
-| P3 | Approval lifecycle and stable task identity | P2 |
-| P4 | Jev validation, deadlines, fallbacks, and budgets | P2 |
-| P5 | Better gate, sanitize, verify, pulse, and steer evidence | P3, P4 |
-| P6 | Capability registry and versioned bitmap implementation | P2 |
-| P7 | Jev Select and capability policy | P4, P6 |
-| P8 | Skill loading, discovery, and dynamic context integration | P5, P7 |
-| F0 | Bounded output artifacts and recovery tools | P1, P2, P4 |
-| F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 |
-| F2 | Focus integration and controlled rollout | P8, F1 |
-| P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 |
-| P10 | Measured caching, batching, and journal improvements | P9 |
-| P11 | Tend: deliberate provider-aware compaction checkpoints | P8, F2, P9; experimental |
+| ID | Work | Depends on | Status |
+|---|---|---|---|
+| P0 | Product documentation and runtime contract tests | — | Landed |
+| P1 | Reliable tools, paths, and model resolution | P0 | Landed |
+| P2 | Session evidence and journal schema v2 | P1 | Landed |
+| P3 | Approval lifecycle and stable task identity | P2 | Landed |
+| P4 | Jev validation, deadlines, fallbacks, and budgets | P2 | Landed |
+| P5 | Better gate, sanitize, verify, pulse, and steer evidence | P3, P4 | Landed |
+| P6 | Capability registry and versioned bitmap implementation | P2 | Landed |
+| P7 | Jev Select and capability policy | P4, P6 | Not started |
+| P8 | Skill loading, discovery, and dynamic context integration | P5, P7 | Not started |
+| F0 | Bounded output artifacts and recovery tools | P1, P2, P4 | Landed |
+| F1 | Generic Jev Focus, completeness policy, and section bitmaps | P5, P6, F0 | Not started |
+| F2 | Focus integration and controlled rollout | P8, F1 | Not started |
+| P9 | Faithful policy replay and evaluation tooling | P5, P8, F2 | Not started |
+| P10 | Measured caching, batching, and journal improvements | P9 | Not started |
+| P11 | Tend: deliberate provider-aware compaction checkpoints | P8, F2, P9; experimental | Not started |
+
+The registry exists and is compiled, but nothing selects against it yet: Select
+(P7) is the first unit that turns a judgment into an active bitmap, and P8 is
+the first that changes the executable tool set. Until then the active set is
+baseline plus explicit, and Steer reads it only as evidence.
 
 Develop evaluation fixtures alongside each feature, then assemble the comparison suite in P9. Dependencies express sequencing, not a requirement to delegate to multiple agents.
 
@@ -476,24 +481,24 @@ For each implementation unit, run focused tests and `npm run typecheck`. Run `np
 
 Required integration scenarios before calling this iteration complete:
 
-- [ ] A multi-chunk command returns accurate bounded output and exit status.
+- [x] A multi-chunk command returns accurate bounded output and exit status.
 - [ ] Cancellation during execution, approval, selection, and Jev retry waiting settles the run.
-- [ ] A custom `--cwd` is used consistently by tools and static checks.
-- [ ] An approved action executes once in the active run; denial and EOF execute nothing.
-- [ ] Approval responses preserve task identity and constraints.
-- [ ] Every delivered tool-output excerpt has been checked, including error output and paginated tails.
-- [ ] Verification distinguishes an intentionally reproduced failure from an unhelpful result.
-- [ ] Main/mini routing changes the actual model, or skips routing when identical.
+- [x] A custom `--cwd` is used consistently by tools and static checks.
+- [x] An approved action executes once in the active run; denial and EOF execute nothing.
+- [x] Approval responses preserve task identity and constraints.
+- [x] Every delivered tool-output excerpt has been checked, including error output and paginated tails.
+- [x] Verification distinguishes an intentionally reproduced failure from an unhelpful result.
+- [x] Main/mini routing changes the actual model, or skips routing when identical.
 - [ ] Capability selection supports none/one/many, dependencies, explicit requirements, and discovery recovery.
-- [ ] Bitmap serialization, version validation, and catalog remapping are correct beyond 32 and 64 entries.
+- [x] Bitmap serialization, version validation, and catalog remapping are correct beyond 32 and 64 entries.
 - [ ] Generic output sections preserve exact evidence, source identity, dependencies, and tested Unicode offsets.
 - [ ] Exhaustive requests bypass selective focusing; computations use code rather than Jev counting.
-- [ ] Omitted output is recoverable without rerunning commands; capture truncation and expiry are explicit.
+- [x] Omitted output is recoverable without rerunning commands; capture truncation and expiry are explicit.
 - [ ] Focusing changes only new presented results, and recovery receives normal sanitization.
 - [ ] The provider sees the intended tools/skills on initial calls, later turns, and subsequent user prompts.
 - [ ] Tool/skill changes and checkpoints respect provider cache/opaque-reasoning contracts, not only tool pairing.
 - [ ] Journal v2 explains each decision and original-policy replay reproduces it.
-- [ ] Outages follow the documented fallback table; hard budgets remain independent of Jev.
+- [x] Outages follow the documented fallback table; hard budgets remain independent of Jev.
 - [ ] Evaluation reports outcomes, selection errors, cost, context size, and measured critical-path timing.
 
 ## 5. Deliberate exclusions and later research

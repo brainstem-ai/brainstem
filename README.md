@@ -18,6 +18,19 @@ Planned: **Select**, **Focus**
 
 **Tend** is a later checkpoint workflow, not a continuous filter.
 
+What each reflex is shown is as much a part of the contract as what it decides:
+
+| Reflex | Evidence it receives |
+|---|---|
+| Gate | The real action — the command, or for a write a bounded diff (existing file) or first-40-lines summary (new file), flagged when the evidence is incomplete. The approval hash stays out of it. |
+| Sanitize / Verify | One bounded envelope: task, source, action summary, capped intent, status, truncation, and the exact content to be delivered. |
+| Pulse | Recent actions with statuses, labelled repeat counts, failure fingerprints, and whether the approach changed — all computed in code. |
+| Steer | The latest completed observation and the active capability descriptions. |
+
+Literal facts are never delegated: containment, counts, durations, exit codes and
+budgets are computed in code. A write resolving outside the project root skips
+Gate's judgment entirely and takes the static floor verdict.
+
 ## Setup
 
 ```sh
@@ -34,9 +47,31 @@ bun packages/cli/src/main.ts --cwd /tmp/repo --task "fix the failing test" --tru
 
 `trust` raises/lowers the auto-run CONFIDENCE BAR (`policy.ts`: `autoConfidence = 0.95 - 0.35*trust`). `trust 0` does NOT mean "ask about everything". Safety thresholds (deny lines, credential nouls) never change with trust.
 
-## Approvals today
+## Approvals
 
-The gate's "ask" decision returns a blocked tool result telling the agent to ask the user. The full interactive approval lifecycle lands in P3.
+A gate `ask` opens a pending approval and waits inside the pre-execution hook.
+Approval permits that exact validated action once; denial, EOF, and cancellation
+execute nothing, and neither elapsed time nor an empty response approves. If the
+action changes between request and resolution, the approval is invalidated.
+
+Without an approval handler (a non-interactive run), an `ask` returns a blocked
+tool result telling the agent to ask the user, and the CLI exits nonzero.
+
+## Output artifacts and recovery
+
+Every captured tool result is stored whole as an artifact before any reduced view
+is presented, so nothing the model was not shown is lost. Two always-available
+tools recover it without rerunning the command:
+
+```
+read_output({ id, startLine, lineCount })
+search_output({ id, pattern, limit })
+```
+
+Responses carry their real source ranges and completeness markers, and pass
+through the same sanitize path as any other tool result. Unknown ID, evicted
+artifact, capture truncation, and empty source are distinct outcomes — never a
+bare "no output". The store is bounded per session and evicts by age.
 
 ## Replay
 
