@@ -1,3 +1,5 @@
+<img src="../../assets/icon.svg" alt="" width="32" height="41">
+
 # @brainstem/pi-adapter
 
 Wires [`@brainstem/reflexes`](../reflexes) into a

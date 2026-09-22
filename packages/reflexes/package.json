@@ -1,8 +1,9 @@
 {
   "name": "@brainstem/reflexes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/crc442/brainstem.git", "directory": "packages/reflexes" },
   "files": ["dist"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,7 +15,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@brainstem/core": "^0.1.0",
+    "@brainstem/core": "^0.1.1",
     "@typesafe-ai/sdk": "^0.6.0"
   },
   "devDependencies": {

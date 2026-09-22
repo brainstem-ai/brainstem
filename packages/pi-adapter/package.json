@@ -1,8 +1,9 @@
 {
   "name": "@brainstem/pi-adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/crc442/brainstem.git", "directory": "packages/pi-adapter" },
   "files": ["dist"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,7 +14,7 @@
     "build": "tsup"
   },
   "dependencies": {
-    "@brainstem/reflexes": "^0.1.0"
+    "@brainstem/reflexes": "^0.1.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-agent-core": ">=0.86.1"

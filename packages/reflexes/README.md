@@ -1,3 +1,5 @@
+<img src="../../assets/icon.svg" alt="" width="32" height="41">
+
 # @brainstem/reflexes
 
 A standalone library of bounded judgment reflexes for coding agents: `gate`

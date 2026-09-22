@@ -1,4 +1,4 @@
-# brainstem
+<p align="center"><img src="assets/wordmark.png" alt="brainstem" width="420"></p>
 
 Bounded judgment reflexes for coding agents — a small, pluggable "System 1" that
 sits between an agent and its tools: gating risky commands, sanitizing tool

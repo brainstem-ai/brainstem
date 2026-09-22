@@ -1,3 +1,5 @@
+<img src="../../assets/icon.svg" alt="" width="32" height="41">
+
 # @brainstem/core
 
 The reflex engine underneath brainstem. Most consumers should use

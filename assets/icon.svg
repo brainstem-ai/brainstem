@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78 100" role="img" aria-label="brainstem">
+  <rect x="0" y="18" width="18" height="82" fill="currentColor"/>
+  <rect x="0" y="0" width="37" height="18" fill="currentColor"/>
+  <path fill-rule="evenodd" fill="currentColor" d="M18,40 L56,40 L70,54 L70,74 L56,88 L18,88 Z M18,52 L44,52 L44,76 L18,76 Z"/>
+</svg>
