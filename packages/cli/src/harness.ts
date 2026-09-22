@@ -666,6 +666,35 @@ export function createHarness(options: HarnessOptions): Harness {
           const prepared = toolCall.name === "write" ? writeApprovalPrepared() : {};
           return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal, prepared);
         }
+
+        // "auto": bind execution to the target/preimage captured above. Jev
+        // evaluation is an await point — a write whose target or existing
+        // content changed WHILE that call was in flight (e.g. a parent
+        // directory swapped for a symlink mid-request, or the target file
+        // edited) must not silently proceed just because the semantic
+        // judgment came back favorable for the ORIGINAL target. This closes
+        // the same class of gap R3's approval recheck closes for the "ask"
+        // path, for the "auto" path, where nothing else re-verifies
+        // anything between gate and execution.
+        if (toolCall.name === "write") {
+          const recheck = writeApprovalPrepared().recheck();
+          if (recheck.changed) {
+            const why = `write target changed during gate evaluation: ${recheck.reason}`;
+            journal.append({
+              t: "decision",
+              v: 2,
+              ts: Date.now(),
+              reflex: "gate",
+              action: "deny",
+              reasons: [why],
+              staticVerdict: "deny",
+            });
+            options.onReflex?.(render("gate", "deny", [why]));
+            const reason = `[brainstem] denied: ${why}. Re-run for a fresh review.`;
+            emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
+            return { block: true, reason };
+          }
+        }
         return undefined;
       }
 

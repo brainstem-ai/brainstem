@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
@@ -567,6 +567,67 @@ describe("harness integration", () => {
     ) as { isError: boolean; content: { text: string }[] } | undefined;
     expect(writeResult?.isError).toBe(true);
     expect(writeResult?.content[0]?.text).toContain("denied");
+
+    rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  test("R2 regression: a parent directory swapped for a symlink WHILE the Gate judgment is in flight is caught before the write executes", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-harness-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "brainstem-harness-outside-"));
+    mkdirSync(join(dir, "sub"));
+    writeFileSync(join(dir, "sub", "file.txt"), "inside");
+    writeFileSync(join(outsideDir, "file.txt"), "outside");
+    const journalPath = join(dir, "journal.ndjson");
+
+    // The write's target is resolved once BEFORE the Jev call (writeCheck),
+    // and the gate judgment itself is where the attack happens: the mock
+    // judge swaps "sub" for a symlink to an outside directory WHILE
+    // engine.gate() is awaited, simulating a race during real (slow, async)
+    // Jev latency. A gate decision of "auto" must not let the write proceed
+    // against whatever now resolves at that path.
+    let swapped = false;
+    const mock = mockSystemOne((_state, _questions): Record<string, Answer> => {
+      if (!swapped) {
+        swapped = true;
+        rmSync(join(dir, "sub"), { recursive: true, force: true });
+        symlinkSync(outsideDir, join(dir, "sub"));
+      }
+      return {
+        destructive: scoreAnswer(0, 0.9),
+        touches_credentials: noulAnswer(0.01),
+        exfiltrates: noulAnswer(0.01),
+        on_task: noulAnswer(0.99),
+        disposition: choiceAnswer("auto_run", 0.99, { auto_run: 0.99, ask_user: 0.005, deny: 0.005 }),
+      };
+    });
+
+    const harness = createHarness({
+      systemOne: mock,
+      streamFn: scriptedStream([
+        assistantMessage(
+          [{ type: "toolCall", id: "tc1", name: "write", arguments: { path: "sub/file.txt", content: "escaped" } }],
+          "toolUse",
+        ),
+        assistantMessage([{ type: "text", text: "Done." }], "stop"),
+      ]),
+      model: { id: "m", api: "anthropic-messages" } as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+      approvalHandler: async () => "approve_once", // must never be reached — this is a hard, code-level deny
+    });
+
+    await harness.prompt("update the file");
+
+    expect(readFileSync(join(outsideDir, "file.txt"), "utf8")).toBe("outside");
+    expect(harness.approvalsRequested()).toBe(0);
+    const transcript = harness.agent.state.messages;
+    const writeResult = transcript.find(
+      (m) => m.role === "toolResult" && (m as { toolCallId?: string }).toolCallId === "tc1",
+    ) as { isError: boolean; content: { text: string }[] } | undefined;
+    expect(writeResult?.isError).toBe(true);
+    expect(writeResult?.content[0]?.text).toContain("denied");
+    expect(writeResult?.content[0]?.text).toContain("changed during gate evaluation");
 
     rmSync(outsideDir, { recursive: true, force: true });
   });
