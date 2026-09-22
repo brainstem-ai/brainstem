@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { contentHash } from "@brainstem/core";
 import { resolveParentForWrite } from "./paths";
 
 const DIFF_CAP = 1_500;
@@ -10,6 +11,11 @@ const DIFF_LINE_LIMIT = 1_000;
 export interface ChangeSummary {
   changeSummary: string;
   evidenceIncomplete: boolean;
+  // Precondition for R3: a digest of the file's content at gate time (or the
+  // fixed sentinel "absent" when it didn't exist), re-checked right before
+  // an approval is consumed so a target substituted after review cannot
+  // silently ride an earlier approval through to execution.
+  existingDigest: string;
 }
 
 function splitLines(text: string): string[] {
@@ -54,11 +60,16 @@ function unifiedDiff(before: string[], after: string[]): string {
   return out.join("\n");
 }
 
-function capped(body: string, header: string): ChangeSummary {
-  if (body.length <= DIFF_CAP) return { changeSummary: `${header}\n${body}`, evidenceIncomplete: false };
+// A file can never legitimately hash to this literal string (contentHash is
+// hex-encoded sha256), so it is a safe, unambiguous "no file existed" marker.
+export const ABSENT_DIGEST = "absent";
+
+function capped(body: string, header: string, existingDigest: string): ChangeSummary {
+  if (body.length <= DIFF_CAP) return { changeSummary: `${header}\n${body}`, evidenceIncomplete: false, existingDigest };
   return {
     changeSummary: `${header}\n${body.slice(0, DIFF_CAP)}\n... (change summary truncated at ${DIFF_CAP} chars)`,
     evidenceIncomplete: true,
+    existingDigest,
   };
 }
 
@@ -80,28 +91,30 @@ export function changeSummaryForWrite(root: string, target: string, content: str
   }
 
   const bytes = Buffer.byteLength(content, "utf8");
+  const existingDigest = existing === undefined ? ABSENT_DIGEST : contentHash(existing);
 
   if (existing === undefined) {
     const lines = splitLines(content);
     const head = lines.slice(0, NEW_FILE_LINES);
     const elided = lines.length > NEW_FILE_LINES;
     const header = `new file ${target} (${bytes} bytes, ${lines.length} lines)${elided ? `, first ${NEW_FILE_LINES} lines:` : ":"}`;
-    const summary = capped(head.join("\n"), header);
-    return { changeSummary: summary.changeSummary, evidenceIncomplete: summary.evidenceIncomplete || elided };
+    const summary = capped(head.join("\n"), header, existingDigest);
+    return { changeSummary: summary.changeSummary, evidenceIncomplete: summary.evidenceIncomplete || elided, existingDigest };
   }
 
   if (existing === content) {
-    return { changeSummary: `overwrite ${target} with identical content (${bytes} bytes)`, evidenceIncomplete: false };
+    return { changeSummary: `overwrite ${target} with identical content (${bytes} bytes)`, evidenceIncomplete: false, existingDigest };
   }
 
   const before = splitLines(existing);
   const after = splitLines(content);
   if (before.length > DIFF_LINE_LIMIT || after.length > DIFF_LINE_LIMIT) {
     return {
+      existingDigest,
       changeSummary: `overwrite ${target}: ${before.length} lines (${Buffer.byteLength(existing, "utf8")} bytes) replaced by ${after.length} lines (${bytes} bytes); too large to diff`,
       evidenceIncomplete: true,
     };
   }
 
-  return capped(unifiedDiff(before, after), `overwrite existing ${target} (${before.length} -> ${after.length} lines):`);
+  return capped(unifiedDiff(before, after), `overwrite existing ${target} (${before.length} -> ${after.length} lines):`, existingDigest);
 }

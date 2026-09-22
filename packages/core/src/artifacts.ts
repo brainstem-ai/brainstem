@@ -1,30 +1,47 @@
 import { createHash } from "node:crypto";
 
+// Bumping this invalidates on-disk metadata written by an older shape — see
+// LocalArtifactStore, which skips (never crashes on) a meta file whose
+// schemaVersion does not match.
+export const ARTIFACT_SCHEMA_VERSION = 1;
+
+export interface StreamMeta {
+  /** Total bytes the source actually produced for this stream, even if not all were retained. */
+  bytesObserved: number;
+  /** Bytes actually stored for this stream. */
+  bytesRetained: number;
+  /** True only when bytesRetained === bytesObserved for this stream; never inferred from retained length alone. */
+  complete: boolean;
+}
+
 export interface ArtifactMeta {
   artifactId: string;
+  /** Owning session — validated on every read/search/list so one session can never retrieve or evict another's artifacts (R7). */
+  sessionId: string;
+  schemaVersion: number;
   toolCallId: string;
   tool: string;
   commandOrTarget: string; // command for bash, path for read/write
-  contentHash: string; // sha-256 of full capture
-  byteCount: number;
-  lineCount: number;
-  captureComplete: boolean; // false when capture hit the byte limit
+  contentHash: string; // sha-256 of the canonical combined-for-hash representation (documented per caller)
+  byteCount: number; // total retained bytes across all streams
+  lineCount: number; // total retained lines across all streams (documented ordering: stream insertion order)
+  captureComplete: boolean; // true iff every declared stream is complete
   createdAt: number;
   evicted?: boolean; // content deleted under store limits; meta retained
+  /** Named streams this artifact was captured with — e.g. {stdout, stderr} for bash, {output} for everything else. */
+  streams: Record<string, StreamMeta>;
 }
 
-export interface ArtifactRecord extends ArtifactMeta {
-  streams?: { stdoutBytes: number; stderrBytes: number };
-}
+export type ArtifactRecord = ArtifactMeta;
 
 export interface ArtifactEntry {
   meta: ArtifactMeta;
   // null when the content was evicted; recovery surfaces this as an explicit expired outcome
-  content: string | null;
+  content: Record<string, string> | null;
 }
 
 export interface ArtifactStore {
-  put(record: ArtifactMeta, content: string): void;
+  put(record: ArtifactMeta, content: Record<string, string>): void;
   get(id: string): ArtifactEntry | null;
   list(): ArtifactMeta[];
 }

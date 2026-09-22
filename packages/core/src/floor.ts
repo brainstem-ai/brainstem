@@ -1,3 +1,5 @@
+import { isInside, resolvePath } from "./paths";
+
 export type StaticVerdict = "deny" | "ask" | null;
 
 export interface StaticAction {
@@ -34,7 +36,11 @@ const DENY_WRITE_PATHS: RegExp[] = [
 ];
 
 const DENY_WRITE_OUTSIDE_ROOT: RegExp[] = [
-  /^(\/etc|\/var|\/usr|\/System|\/Library)\//,
+  // /etc, /var, and /tmp are symlinks to /private/{etc,var,tmp} on macOS —
+  // matched against the realpath'd resolution (see resolvePath in
+  // ./paths.ts), so both forms must be listed or canonicalization alone
+  // would quietly route a system-directory write from "deny" to "ask".
+  /^(\/etc|\/var|\/usr|\/System|\/Library|\/private\/etc|\/private\/var|\/private\/tmp)\//,
 ];
 
 const ASK_READ_PATHS: RegExp[] = [
@@ -43,30 +49,6 @@ const ASK_READ_PATHS: RegExp[] = [
   /\.ssh\//,
   /id_rsa|id_ed25519/,
 ];
-
-const HOME = process.env.HOME ?? "";
-
-function expandHome(path: string): string {
-  return path.replace(/^~(?=\/|$)/, HOME || "~");
-}
-
-function resolveUnderRoot(root: string, target: string): string {
-  const expanded = expandHome(target);
-  const abs = expanded.startsWith("/") ? expanded : `${root.replace(/\/+$/, "")}/${expanded}`;
-  const parts: string[] = [];
-  for (const seg of abs.split("/")) {
-    if (seg === "" || seg === ".") continue;
-    if (seg === "..") parts.pop();
-    else parts.push(seg);
-  }
-  return "/" + parts.join("/");
-}
-
-function isInside(root: string, resolved: string): boolean {
-  const base = root.replace(/\/+$/, "") || "/";
-  if (resolved === base) return true;
-  return resolved.startsWith(base.endsWith("/") ? base : `${base}/`);
-}
 
 export function staticVerdict(tool: string, action: StaticAction, root: string): StaticVerdict {
   // Command-pattern checks are NOT an OS sandbox — they are a heuristic first line of defense.
@@ -78,7 +60,10 @@ export function staticVerdict(tool: string, action: StaticAction, root: string):
   }
 
   if (action.path) {
-    const path = resolveUnderRoot(root, action.path);
+    // Same resolver execution uses (packages/core/src/paths.ts): the floor's
+    // policy decision and the actual write/read target can never disagree
+    // about what a path canonicalizes to.
+    const path = resolvePath(root, action.path);
     const inside = isInside(root, path);
 
     if (tool === "write") {

@@ -1,9 +1,13 @@
 import { Agent, type AgentTool, type StreamFn } from "@earendil-works/pi-agent-core";
 import type { Message, Model, Api } from "@earendil-works/pi-ai";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   ReflexEngine,
+  ARTIFACT_SCHEMA_VERSION,
   BoundedAnswerCache,
+  boundForReview,
+  REVIEW_CHAR_CAP,
   contentHash,
   countLines,
   splitIntoSections,
@@ -32,8 +36,8 @@ import { makeDiscoveryTool } from "./capabilities/discovery";
 import { CapabilityRegistry } from "./capabilities/registry";
 import { SelectDriver } from "./capabilities/select-policy";
 import { loadSkillsFromRoot } from "./capabilities/skills";
-import { changeSummaryForWrite } from "./change-summary";
-import { isInside, resolveParentForWrite } from "./paths";
+import { ABSENT_DIGEST, changeSummaryForWrite } from "./change-summary";
+import { checkWriteTarget, isInside } from "./paths";
 import { SessionRecorder } from "./session";
 import { makeTools } from "./tools";
 import { LocalArtifactStore } from "./output/artifact-store";
@@ -91,8 +95,18 @@ interface ToolDetails {
   exit?: number;
   durationMs?: number;
   truncated?: boolean;
+  // bash: separate captured streams (see packages/cli/src/tools.ts).
   stdoutBytes?: number;
   stderrBytes?: number;
+  stdoutText?: string;
+  stderrText?: string;
+  stdoutObservedBytes?: number;
+  stderrObservedBytes?: number;
+  stdoutComplete?: boolean;
+  stderrComplete?: boolean;
+  // read: bounded-streaming file read (see packages/cli/src/tools.ts).
+  sourceBytes?: number;
+  retainedBytes?: number;
 }
 
 function detailsOf(result: unknown): ToolDetails {
@@ -109,6 +123,29 @@ function argsSummaryFor(args: unknown): unknown {
   if (args === null || typeof args !== "object") return args ?? {};
   const { content: _content, ...rest } = args as Record<string, unknown>;
   return rest;
+}
+
+// R3: the action hash used for approval must include write CONTENT identity
+// (digest + length), not just the args with content stripped out — otherwise
+// approval of "write path X with content A" is indistinguishable from
+// approval of "write path X with content B". `v` versions the hash schema:
+// a formula change here naturally invalidates any historical hash, since a
+// differently-versioned hash can never equal one computed under this
+// version.
+const ACTION_HASH_SCHEMA_VERSION = 1;
+
+function actionIdentity(tool: string, args: unknown, extra: { target?: string; preconditionDigest?: string } = {}): unknown {
+  const content = (args as { content?: string } | undefined)?.content;
+  return {
+    v: ACTION_HASH_SCHEMA_VERSION,
+    tool,
+    ...(argsSummaryFor(args) as object),
+    ...(typeof content === "string"
+      ? { contentDigest: contentHash(content), contentLength: Buffer.byteLength(content, "utf8") }
+      : {}),
+    ...(extra.target !== undefined ? { target: extra.target } : {}),
+    ...(extra.preconditionDigest !== undefined ? { preconditionDigest: extra.preconditionDigest } : {}),
+  };
 }
 
 function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -164,7 +201,16 @@ export function createHarness(options: HarnessOptions): Harness {
     return { block: true, reason: `[brainstem] ${reason} Ask the user to confirm, and re-run only if they approve.` };
   }
 
-  const artifactStore = new LocalArtifactStore(join(dirname(options.journalPath), "artifacts"));
+  // Session-scoped: <journal-parent>/sessions/<sessionId>/artifacts, keyed by
+  // the SessionRecorder-generated id (never a timestamp-only directory name)
+  // so concurrent sessions sharing a journal parent directory can never read
+  // or evict each other's artifacts (R7). Pre-existing shared-directory
+  // artifacts from older sessions are simply never looked at by a new
+  // session — this does not delete or migrate them (see README).
+  const artifactStore = new LocalArtifactStore(
+    join(dirname(options.journalPath), "sessions", recorder.sessionId, "artifacts"),
+    recorder.sessionId,
+  );
   const registry = options.registry ?? new CapabilityRegistry();
   const driver = new SelectDriver({ registry, engine, minRefreshIntervalMs: 0 });
 
@@ -264,7 +310,7 @@ export function createHarness(options: HarnessOptions): Harness {
     delivered: string,
     why: string,
   ): void {
-    recorder.recordAction(hashAction({ tool, args: argsSummaryFor(args) }), actionLabel(tool, args));
+    recorder.recordAction(hashAction(actionIdentity(tool, args)), actionLabel(tool, args));
     emitObservation(
       {
         toolCallId,
@@ -281,28 +327,46 @@ export function createHarness(options: HarnessOptions): Harness {
     );
   }
 
+  interface ApprovalPrepared {
+    target?: string;
+    changeSummary?: string;
+    preconditionDigest?: string;
+    /** Re-verified immediately before consuming approval: target identity and preimage must not have changed underneath a pending request. */
+    recheck?: () => { changed: boolean; reason: string };
+  }
+
   async function runApproval(
     toolCallId: string,
     tool: string,
     args: unknown,
     reasons: string[],
     signal: AbortSignal | undefined,
+    prepared: ApprovalPrepared = {},
   ): Promise<{ block: true; reason: string } | undefined> {
     // Approval binds to the validated args of this beforeToolCall invocation: args
     // are fixed within one hook call, so the hash recorded at request time is
-    // re-checked at resolution time against those same validated inputs.
+    // re-checked at resolution time against those same validated inputs. The
+    // hash identity includes write content digest+length and the canonical
+    // target/precondition (see actionIdentity), so approving one write can
+    // never be reinterpreted as approving a different target or payload.
     const approvalId = newId("appr");
     const taskId = recorder.currentTask?.id ?? "";
-    const actionHash = hashAction({ tool, args: argsSummaryFor(args) });
+    const actionHash = hashAction(
+      actionIdentity(tool, args, { target: prepared.target, preconditionDigest: prepared.preconditionDigest }),
+    );
     const request: ApprovalRequest = {
       id: approvalId,
       taskId,
       toolCallId,
       cwd: options.cwd,
       tool,
-      validatedArgs: args ?? {},
+      // Defensive read-only snapshot: JSON round-trip so a handler cannot
+      // mutate the object the execution wrapper will later re-hash from.
+      validatedArgs: args === undefined ? {} : (JSON.parse(JSON.stringify(args)) as unknown),
       actionHash,
       reasons,
+      ...(prepared.target !== undefined ? { target: prepared.target } : {}),
+      ...(prepared.changeSummary !== undefined ? { changeSummary: prepared.changeSummary } : {}),
     };
     approvalsRequestedCount += 1;
     const appendApproval = (status: ApprovalStatus, why?: string) =>
@@ -336,22 +400,39 @@ export function createHarness(options: HarnessOptions): Harness {
       return { block: true, reason };
     }
 
-    if (hashAction({ tool, args: argsSummaryFor(args) }) !== actionHash) {
+    const currentHash = hashAction(
+      actionIdentity(tool, args, { target: prepared.target, preconditionDigest: prepared.preconditionDigest }),
+    );
+    if (currentHash !== actionHash) {
       appendApproval("invalidated", "action changed since request");
       const reason = "[brainstem] approval cancelled";
       emitBlockedObservation(toolCallId, tool, args, reason, "action changed since approval request");
       return { block: true, reason };
     }
 
-    if (resolution === "approve_once") {
-      appendApproval("approved");
-      return undefined;
+    if (resolution !== "approve_once") {
+      appendApproval("denied", "denied by user");
+      const reason = "[brainstem] denied by user";
+      emitBlockedObservation(toolCallId, tool, args, reason, "denied by user");
+      return { block: true, reason };
     }
 
-    appendApproval("denied", "denied by user");
-    const reason = "[brainstem] denied by user";
-    emitBlockedObservation(toolCallId, tool, args, reason, "denied by user");
-    return { block: true, reason };
+    // Recheck target identity and preimage right before consuming approval:
+    // a file edited (or a target substituted) between request and
+    // resolution must re-enter review rather than silently execute against
+    // whatever now sits at that path.
+    if (prepared.recheck) {
+      const check = prepared.recheck();
+      if (check.changed) {
+        appendApproval("invalidated", check.reason);
+        const reason = `[brainstem] approval cancelled: ${check.reason}. Re-run for a fresh review.`;
+        emitBlockedObservation(toolCallId, tool, args, reason, check.reason);
+        return { block: true, reason };
+      }
+    }
+
+    appendApproval("approved");
+    return undefined;
   }
 
   const innerStreamFn = options.streamFn;
@@ -474,10 +555,36 @@ export function createHarness(options: HarnessOptions): Harness {
       const toolCallId = toolCall.id;
 
       if (toolCall.name === "bash" || toolCall.name === "write") {
+        let writeCheck: ReturnType<typeof checkWriteTarget> | undefined;
+        if (toolCall.name === "write") {
+          writeCheck = checkWriteTarget(options.cwd, a.path ?? "");
+          // Reject a symlinked write route outright — authorization and
+          // execution must refer to the same filesystem target, and a final
+          // (or dangling) symlink means they cannot. This never reaches
+          // Jev: rejection beats silently changing which file the write
+          // affects.
+          if (!writeCheck.ok) {
+            const why = `blocked write: ${writeCheck.reason}`;
+            journal.append({
+              t: "decision",
+              v: 2,
+              ts: Date.now(),
+              reflex: "gate",
+              action: "deny",
+              reasons: [why],
+              staticVerdict: "deny",
+            });
+            options.onReflex?.(render("gate", "deny", [why]));
+            const reason = `[brainstem] denied: ${why}. Do not retry this command.`;
+            emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
+            return { block: true, reason };
+          }
+        }
+
         // Literal containment is decided in code, never by a judgment: a write whose
         // resolved target leaves the configured root takes the static floor verdict
         // and never reaches Jev.
-        if (toolCall.name === "write" && !isInside(options.cwd, resolveParentForWrite(options.cwd, a.path ?? ""))) {
+        if (toolCall.name === "write" && !isInside(options.cwd, writeCheck!.resolvedTarget)) {
           const verdict = staticVerdict("write", { path: a.path }, options.cwd) ?? "ask";
           const why = `static floor: write outside project root (${a.path ?? "?"})`;
           journal.append({
@@ -495,7 +602,9 @@ export function createHarness(options: HarnessOptions): Harness {
             emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
             return { block: true, reason };
           }
-          return await runApproval(toolCallId, toolCall.name, args, [why], signal);
+          return await runApproval(toolCallId, toolCall.name, args, [why], signal, {
+            target: writeCheck!.resolvedTarget,
+          });
         }
 
         const change =
@@ -519,7 +628,32 @@ export function createHarness(options: HarnessOptions): Harness {
           return { block: true, reason };
         }
         if (decision.action === "ask") {
-          return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal);
+          const prepared =
+            toolCall.name === "write"
+              ? {
+                  target: writeCheck!.resolvedTarget,
+                  changeSummary: change?.changeSummary,
+                  preconditionDigest: change?.existingDigest,
+                  recheck: () => {
+                    const target = writeCheck!.resolvedTarget;
+                    const recheck = checkWriteTarget(options.cwd, a.path ?? "");
+                    if (!recheck.ok || recheck.resolvedTarget !== target) {
+                      return { changed: true, reason: "write target changed since approval was requested" };
+                    }
+                    let currentDigest: string;
+                    try {
+                      currentDigest = contentHash(readFileSync(target, "utf8"));
+                    } catch {
+                      currentDigest = ABSENT_DIGEST;
+                    }
+                    if (currentDigest !== (change?.existingDigest ?? ABSENT_DIGEST)) {
+                      return { changed: true, reason: "file contents changed since approval was requested" };
+                    }
+                    return { changed: false, reason: "" };
+                  },
+                }
+              : {};
+          return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal, prepared);
         }
         return undefined;
       }
@@ -547,29 +681,67 @@ export function createHarness(options: HarnessOptions): Harness {
     },
     afterToolCall: async ({ toolCall, result, isError }) => {
       const toolCallId = toolCall.id;
-      const fullText = textOf((result?.content ?? []) as { type: string; text?: string }[]);
+      const rawContent = (result?.content ?? []) as { type: string; text?: string }[];
+      const fullText = textOf(rawContent);
+      const nonTextCount = rawContent.filter((c) => c.type !== "text").length;
       const details = detailsOf(result);
 
       // Capture the full output before any sanitize override so the original
-      // bytes stay recoverable even when the presented view is blocked or bounded.
+      // bytes stay recoverable even when the presented view is blocked or
+      // bounded. Captured regardless of isError: untrusted failure text (a
+      // stderr tail, an exception message) needs the same review and
+      // recovery path as any other tool output — R1's whole point is that
+      // isError must never be a bypass. Preserved as separate named streams
+      // (R5): bash keeps stdout/stderr distinct rather than implying their
+      // concatenation reconstructs temporal interleaving; every other
+      // captured tool has exactly one "output" stream. Empty output is still
+      // captured as an empty artifact — "(no output)" is presentation
+      // wording, applied below, never source content.
       let artifact: ArtifactRecord | undefined;
-      if (!isError && fullText.length > 0 && CAPTURED_TOOLS.has(toolCall.name) && !RECOVERY_TOOLS.has(toolCall.name)) {
+      if (CAPTURED_TOOLS.has(toolCall.name) && !RECOVERY_TOOLS.has(toolCall.name)) {
         const args = (toolCall.arguments ?? {}) as { command?: string; path?: string; pattern?: string };
+        const streamContent: Record<string, string> = {};
+        const streams: Record<string, { bytesObserved: number; bytesRetained: number; complete: boolean }> = {};
+        if (toolCall.name === "bash" && details.stdoutText !== undefined) {
+          streamContent.stdout = details.stdoutText;
+          streamContent.stderr = details.stderrText ?? "";
+          streams.stdout = {
+            bytesObserved: details.stdoutObservedBytes ?? Buffer.byteLength(streamContent.stdout, "utf8"),
+            bytesRetained: Buffer.byteLength(streamContent.stdout, "utf8"),
+            complete: details.stdoutComplete !== false,
+          };
+          streams.stderr = {
+            bytesObserved: details.stderrObservedBytes ?? Buffer.byteLength(streamContent.stderr, "utf8"),
+            bytesRetained: Buffer.byteLength(streamContent.stderr, "utf8"),
+            complete: details.stderrComplete !== false,
+          };
+        } else {
+          streamContent.output = fullText;
+          streams.output = {
+            bytesObserved: details.sourceBytes ?? Buffer.byteLength(fullText, "utf8"),
+            bytesRetained: Buffer.byteLength(fullText, "utf8"),
+            complete: details.truncated !== true,
+          };
+        }
         const record: ArtifactRecord = {
           artifactId: newId("art"),
+          sessionId: recorder.sessionId,
+          schemaVersion: ARTIFACT_SCHEMA_VERSION,
           toolCallId,
           tool: toolCall.name,
           commandOrTarget: args.command ?? args.path ?? args.pattern ?? "",
+          // Documented rendering order for the combined hash: stream
+          // insertion order above (stdout before stderr for bash), matching
+          // `fullText`'s own construction in tools.ts — never implied as the
+          // true temporal interleaving.
           contentHash: contentHash(fullText),
-          byteCount: Buffer.byteLength(fullText, "utf8"),
+          byteCount: Object.values(streams).reduce((sum, s) => sum + s.bytesRetained, 0),
           lineCount: countLines(fullText),
-          captureComplete: details.truncated !== true,
+          captureComplete: Object.values(streams).every((s) => s.complete),
           createdAt: Date.now(),
+          streams,
         };
-        if (details.stdoutBytes !== undefined || details.stderrBytes !== undefined) {
-          record.streams = { stdoutBytes: details.stdoutBytes ?? 0, stderrBytes: details.stderrBytes ?? 0 };
-        }
-        artifactStore.put(record, fullText);
+        artifactStore.put(record, streamContent);
         artifact = record;
       }
 
@@ -580,6 +752,9 @@ export function createHarness(options: HarnessOptions): Harness {
         status: isError ? "error" : (details.status ?? "ok"),
         ...(details.exit !== undefined ? { exitCode: details.exit } : {}),
         durationMs: details.durationMs ?? 0,
+        // This excerpt is internal bookkeeping only (journal + recent-activity
+        // summaries for Pulse/Steer) — it must never be reused as a
+        // presentation bound for what's actually delivered to the model.
         excerpt: fullText.slice(0, EXCERPT_CAP),
         truncated: details.truncated ?? fullText.length > EXCERPT_CAP,
       };
@@ -608,6 +783,12 @@ export function createHarness(options: HarnessOptions): Harness {
         options.onReflex?.(render("focus", focusDecision.mode, focusDecision.reasons));
       }
 
+      // The single presentation boundary: an artifact-backed result goes
+      // through presentArtifact's line+char bounding; anything else (a write
+      // confirmation, a recovery-tool page, a discovery result) is expected
+      // to already be a complete, self-bounded view, but boundForReview is
+      // still applied as a backstop so nothing downstream can ever exceed
+      // the same cap Sanitize reviews.
       const view = artifact
         ? presentArtifact(fullText, artifact.artifactId, {
             // "shadow" computes and journals the decision above but never shapes
@@ -617,7 +798,7 @@ export function createHarness(options: HarnessOptions): Harness {
             manifest,
             decision: focusDecision,
           })
-        : { text: obs.excerpt, truncated: obs.truncated };
+        : boundForReview(fullText, REVIEW_CHAR_CAP);
 
       let baseView = view.text;
       let deliveredTruncated = view.truncated;
@@ -625,7 +806,7 @@ export function createHarness(options: HarnessOptions): Harness {
 
       let deliveredExcerpt = baseView;
 
-      if (!isError && fullText.trim()) {
+      if (fullText.trim()) {
         const observed = await timedJev(() =>
           engine.observeToolResult({
             task: taskText(),
@@ -633,11 +814,12 @@ export function createHarness(options: HarnessOptions): Harness {
             actionSummary: intent,
             intent,
             status: obs.status,
-            truncated: obs.truncated,
+            truncated: deliveredTruncated,
             // The exact bounded view the model will see, never a second
             // independent slice of the raw capture — sanitize must not judge
-            // content the agent was never shown.
-            content: baseView.slice(0, 8000),
+            // content the agent was never shown. baseView is already bounded
+            // by the presentation boundary above, so no further slicing here.
+            content: baseView,
           }),
         );
         options.onReflex?.(render("sanitize", observed.sanitize.action, observed.sanitize.reasons));
@@ -648,6 +830,8 @@ export function createHarness(options: HarnessOptions): Harness {
         }
 
         if (observed.sanitize.action === "block") {
+          // A fixed, harness-authored control message — never tool-supplied
+          // text — regardless of whether the blocked result was an error.
           deliveredExcerpt = `[brainstem] blocked tool output (probable injected instructions): ${observed.sanitize.reasons.join("; ")}`;
           deliveredTruncated = false;
           deliveredWhy = `sanitize blocked output: ${observed.sanitize.reasons.join("; ")}`;
@@ -670,6 +854,22 @@ export function createHarness(options: HarnessOptions): Harness {
             deliveredExcerpt = `${notes.join("\n")}\n\n${baseView}`;
           }
         }
+      }
+
+      // Non-text content is never reviewed by Sanitize/Verify (they only see
+      // `fullText`), so it is always withheld rather than labeling a mixed
+      // result "reviewed" because only its text part passed.
+      if (nonTextCount > 0) {
+        const notice = `[brainstem] ${nonTextCount} non-text content part(s) withheld: unreviewed content types are never delivered.`;
+        deliveredExcerpt = fullText.trim() ? `${deliveredExcerpt}\n\n${notice}` : notice;
+        deliveredWhy ??= "non-text content withheld";
+      }
+
+      // "(no output)" is presentation wording only — the artifact above (if
+      // any) already stored the true, possibly-empty capture. Substituted
+      // here, at delivery time, never baked into a tool's own returned text.
+      if (!isError && nonTextCount === 0 && deliveredExcerpt.length === 0) {
+        deliveredExcerpt = "(no output)";
       }
 
       if (artifact) {
@@ -696,9 +896,11 @@ export function createHarness(options: HarnessOptions): Harness {
 
       emitObservation(obs, deliveredExcerpt, deliveredTruncated, deliveredWhy);
 
-      if (isError) return undefined;
-      if (!fullText.trim()) return undefined;
-      if (deliveredExcerpt !== fullText) {
+      if (deliveredExcerpt !== fullText || nonTextCount > 0) {
+        // isError is intentionally omitted here: the framework preserves the
+        // original error flag unless explicitly overridden, and content
+        // review must never itself flip an ok result into an error or vice
+        // versa.
         return { content: [{ type: "text", text: deliveredExcerpt }] };
       }
       return undefined;

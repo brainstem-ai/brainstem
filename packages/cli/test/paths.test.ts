@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isInside, resolveParentForWrite, resolvePath } from "../src/paths";
+import { checkWriteTarget, isInside, resolveParentForWrite, resolvePath, writeFileVerified } from "../src/paths";
 
 let dir: string;
 afterEach(() => {
@@ -26,6 +26,14 @@ describe("resolvePath", () => {
     const home = process.env.HOME ?? "/";
     expect(resolvePath("/repo", "~/notes.txt")).toBe(join(home, "notes.txt"));
     expect(resolvePath("/repo", "~")).toBe(home);
+  });
+});
+
+describe("R2: resolvePath/isInside stay consistent when the root itself is a symlink", () => {
+  test("a not-yet-existing target under a symlinked root (e.g. os.tmpdir() on macOS) still resolves inside", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-symlink-root-"));
+    const resolved = resolvePath(dir, "not-yet-created/file.txt");
+    expect(isInside(dir, resolved)).toBe(true);
   });
 });
 
@@ -58,5 +66,98 @@ describe("resolveParentForWrite", () => {
     dir = mkdtempSync(join(tmpdir(), "brainstem-paths-"));
     const result = resolveParentForWrite(dir, "/tmp/brainstem-escape/file.txt");
     expect(isInside(dir, result)).toBe(false);
+  });
+});
+
+describe("R2: checkWriteTarget / writeFileVerified — bind the check to the actual write", () => {
+  test("a final symlink pointing outside the root is rejected, not followed", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-outside-"));
+    const outsideFile = join(outsideDir, "secret.txt");
+    writeFileSync(outsideFile, "original outside content");
+    const link = join(dir, "link-to-outside.txt");
+    symlinkSync(outsideFile, link);
+
+    const check = checkWriteTarget(dir, "link-to-outside.txt");
+    expect(check.ok).toBe(false);
+    expect(check.reason).toContain("symlink");
+
+    const result = writeFileVerified(dir, "link-to-outside.txt", "attacker-controlled content");
+    expect(result.ok).toBe(false);
+    // The reproduction from the review: a link inside the repo to an outside
+    // file leaves the outside file unchanged and cannot auto-run.
+    expect(readFileSync(outsideFile, "utf8")).toBe("original outside content");
+
+    rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  test("a dangling symlink is rejected, not silently created through", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const link = join(dir, "dangling.txt");
+    symlinkSync(join(dir, "does-not-exist-target.txt"), link);
+
+    const result = writeFileVerified(dir, "dangling.txt", "content");
+    expect(result.ok).toBe(false);
+    expect(existsSync(join(dir, "does-not-exist-target.txt"))).toBe(false);
+  });
+
+  test("a symlinked PARENT directory inside the root is followed via realpath, and containment is still enforced", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-outside-"));
+    const parentLink = join(dir, "linked-dir");
+    symlinkSync(outsideDir, parentLink);
+
+    // Writing THROUGH a symlinked parent directory is allowed (the parent
+    // chain is canonicalized via realpath) but the realpath'd destination is
+    // OUTSIDE the configured root, so containment must catch it — this
+    // module only rejects a symlinked FINAL component outright; outside-root
+    // containment for a symlinked parent is the caller's (harness gate's)
+    // responsibility, verified here at the resolution layer.
+    const check = checkWriteTarget(dir, "linked-dir/new-file.txt");
+    expect(check.ok).toBe(true);
+    expect(isInside(dir, check.resolvedTarget)).toBe(false);
+    expect(isInside(outsideDir, check.resolvedTarget)).toBe(true);
+
+    rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  test("writing to a hard-linked destination does not modify the other link's inode (no in-place truncation)", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const target = join(dir, "target.txt");
+    const other = join(dir, "other-link.txt");
+    writeFileSync(target, "shared original content");
+    linkSync(target, other);
+    expect(statSync(target).ino).toBe(statSync(other).ino);
+
+    const result = writeFileVerified(dir, "target.txt", "new content via target");
+    expect(result.ok).toBe(true);
+    expect(readFileSync(target, "utf8")).toBe("new content via target");
+    // The other hardlink must still see the ORIGINAL content: a rename-based
+    // replace creates a new inode rather than truncating the shared one.
+    expect(readFileSync(other, "utf8")).toBe("shared original content");
+  });
+
+  test("an existing non-regular-file occupant (a directory) is rejected rather than silently replaced", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    mkdirSync(join(dir, "a-directory"));
+    const result = writeFileVerified(dir, "a-directory", "content");
+    expect(result.ok).toBe(false);
+    expect(statSync(join(dir, "a-directory")).isDirectory()).toBe(true);
+  });
+
+  test("an ordinary write to a new file inside the root succeeds and is atomic (no leftover temp files)", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const result = writeFileVerified(dir, "new/nested/file.txt", "hello");
+    expect(result.ok).toBe(true);
+    expect(readFileSync(join(dir, "new", "nested", "file.txt"), "utf8")).toBe("hello");
+  });
+
+  test("a sibling-prefix path is not treated as inside the root", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const sibling = `${dir}-sibling`;
+    mkdirSync(sibling);
+    const check = checkWriteTarget(dir, join("..", `${dir.split("/").pop()}-sibling`, "file.txt"));
+    expect(isInside(dir, check.resolvedTarget)).toBe(false);
+    rmSync(sibling, { recursive: true, force: true });
   });
 });

@@ -64,4 +64,13 @@ describe("staticVerdict", () => {
     expect(staticVerdict("write", { path: "/repo/auth.ts" }, "/repo")).toBeNull();
     expect(staticVerdict("write", { path: "/repo/subdir/../auth.ts" }, "/repo")).toBeNull();
   });
+
+  test("R2: system paths still deny through their realpath'd form (macOS symlinks /etc, /var, /tmp to /private/*)", () => {
+    // Regression: canonicalizing the target through resolvePath's realpath
+    // must not accidentally soften a system-path deny into an "outside
+    // root" ask just because the canonical form uses a different spelling.
+    expect(staticVerdict("write", { path: "/etc/hosts" }, ROOT)).toBe("deny");
+    expect(staticVerdict("write", { path: "/private/etc/hosts" }, ROOT)).toBe("deny");
+    expect(staticVerdict("write", { path: "/var/log/system.log" }, ROOT)).toBe("deny");
+  });
 });

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { loadJournal, mockSystemOne, noulAnswer, choiceAnswer, scoreAnswer, type Answer } from "@brainstem/core";
+import { ARTIFACT_SCHEMA_VERSION, loadJournal, mockSystemOne, newId, noulAnswer, choiceAnswer, scoreAnswer, type Answer } from "@brainstem/core";
 import { createHarness } from "../src/harness";
 
 const { bashCommands } = vi.hoisted(() => ({ bashCommands: [] as string[] }));
@@ -222,7 +222,9 @@ describe("recovery integration", () => {
 
     // tc3: read_output recovers lines 45-50 from the artifact without rerunning bash.
     const tc3 = toolResultText(messages, "tc3");
-    expect(tc3).toMatch(new RegExp(`artifact ${artifactIdFor(journalPath, "tc1")} lines 45-50 of 50 \\(complete\\)`));
+    expect(tc3).toMatch(
+      new RegExp(`artifact ${artifactIdFor(journalPath, "tc1")} stream stdout lines 45-50 of 50 \\(complete\\)`),
+    );
     expect(tc3).toContain("line-45");
     expect(tc3).toContain("line-50");
     expect(bashCommands).toHaveLength(1);
@@ -273,10 +275,15 @@ describe("recovery integration", () => {
 
     const { LocalArtifactStore } = await import("../src/output/artifact-store");
     const { makeRecoveryTools } = await import("../src/output/recovery-tools");
-    const store = new LocalArtifactStore(join(dir, "artifacts"), { maxArtifacts: 1 });
+    const sessionId = "sess_11111111-1111-1111-1111-111111111111";
+    const store = new LocalArtifactStore(join(dir, "artifacts"), sessionId, { maxArtifacts: 1 });
+    const firstId = newId("art");
+    const secondId = newId("art");
     store.put(
       {
-        artifactId: "art_first",
+        artifactId: firstId,
+        sessionId,
+        schemaVersion: ARTIFACT_SCHEMA_VERSION,
         toolCallId: "tc0",
         tool: "bash",
         commandOrTarget: "echo first",
@@ -285,12 +292,15 @@ describe("recovery integration", () => {
         lineCount: 1,
         captureComplete: true,
         createdAt: 1,
+        streams: { output: { bytesObserved: 5, bytesRetained: 5, complete: true } },
       },
-      "first",
+      { output: "first" },
     );
     store.put(
       {
-        artifactId: "art_second",
+        artifactId: secondId,
+        sessionId,
+        schemaVersion: ARTIFACT_SCHEMA_VERSION,
         toolCallId: "tc1",
         tool: "bash",
         commandOrTarget: "echo second",
@@ -299,15 +309,16 @@ describe("recovery integration", () => {
         lineCount: 1,
         captureComplete: true,
         createdAt: 2,
+        streams: { output: { bytesObserved: 6, bytesRetained: 6, complete: true } },
       },
-      "second",
+      { output: "second" },
     );
     const [readOutput] = makeRecoveryTools({ store });
 
-    const result = (await readOutput!.execute("x", { id: "art_first" })) as {
+    const result = (await readOutput!.execute("x", { id: firstId })) as {
       content: { text: string }[];
     };
-    expect(result.content[0]?.text).toContain("artifact art_first expired");
+    expect(result.content[0]?.text).toContain(`artifact ${firstId} expired`);
     expect(result.content[0]?.text).not.toContain("unknown artifact");
   });
 });

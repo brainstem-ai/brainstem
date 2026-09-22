@@ -22,7 +22,7 @@ What each reflex is shown is as much a part of the contract as what it decides:
 | Reflex | Evidence it receives |
 |---|---|
 | Gate | The real action — the command, or for a write a bounded diff (existing file) or first-40-lines summary (new file), flagged when the evidence is incomplete. The approval hash stays out of it. |
-| Sanitize / Verify | One bounded envelope: task, source, action summary, capped intent, status, truncation, and the exact content actually delivered — never a second independent slice of the raw capture. |
+| Sanitize / Verify | One bounded envelope: task, source, action summary, capped intent, status, truncation, and the exact content actually delivered — never a second independent slice of the raw capture. Reviewed regardless of `isError`: a thrown tool error's text gets the same review as any other output, not a bypass. The bound is one shared character cap (`packages/core/src/presentation.ts`, `REVIEW_CHAR_CAP` = 8,000 chars) applied once, before both Sanitize and delivery — a single very long line cannot exceed it either. |
 | Pulse | Recent actions with statuses, labelled repeat counts, failure fingerprints, and whether the approach changed — all computed in code. |
 | Steer | The latest completed observation and the active capability descriptions. |
 | Select | One independent relevance judgment per optional catalog capability, batched by size; code always includes baseline and explicit selections. |
@@ -55,24 +55,99 @@ Approval permits that exact validated action once; denial, EOF, and cancellation
 execute nothing, and neither elapsed time nor an empty response approves. If the
 action changes between request and resolution, the approval is invalidated.
 
+The approval's identity (its `actionHash`) covers tool, canonical resolved
+target/cwd, all validated non-content arguments, and — for a write — a digest
+and byte length of the proposed content plus a digest of the file's existing
+content at request time. Approving a write with one payload never permits a
+different payload, and a file edited (or its target substituted) between
+request and resolution invalidates the approval instead of silently executing
+against whatever now sits at that path. The interactive approval prompt is
+shown the actual proposed diff/new-file summary, not just the command or path;
+the durable journal entry stays bounded (hash + reasons only).
+
 Without an approval handler (a non-interactive run), an `ask` returns a blocked
 tool result telling the agent to ask the user, and the CLI exits nonzero.
 
+## Write safety
+
+Every write (both the harness's pre-execution gate and the `write` tool's own
+execution) resolves the target through one shared canonical resolver
+(`packages/core/src/paths.ts`, reused by `packages/core/src/floor.ts`'s static
+policy and `packages/cli/src/paths.ts`'s execution helpers), and rejects a
+write whose final path component is a symlink — existing (inside or outside
+the root) or dangling — with an explicit blocked outcome, before Jev ever sees
+it. The write itself lands via a same-directory temp file + atomic rename,
+which never dereferences a destination symlink and never truncates a
+hard-linked file's shared inode in place.
+
+**Supported guarantee:** final-symlink rejection and hardlink-safe atomic
+replacement are structural (kernel-enforced by `O_*`/`rename()` semantics),
+not probabilistic. **Not claimed:** full descriptor-relative (`openat`-style)
+traversal — Bun/Node expose no public API for it — so a symlink substituted
+into an *intermediate* ancestor directory between path resolution and the
+final rename is a real, unclosed TOCTOU window on this platform. Closing it
+fully requires a native addon or an external sandboxing executor; this
+release does not claim that guarantee, per the review remediation plan's
+explicit escape hatch (see `docs/plans/2026-09-22-review-remediation.md`, R2).
+
+## Managed process termination
+
+The `bash` tool launches commands in their own POSIX process group (via
+`detached: true`) and, on timeout or cancellation, signals the whole group —
+not just the immediate shell — with SIGTERM, a short configurable grace
+period, then SIGKILL. Pipe drainage is bounded past that point so a lingering
+descendant cannot hang the tool call indefinitely.
+
+**Supported guarantee:** ordinary parent/child/grandchild descendants,
+including a process that ignores SIGTERM, are terminated within the
+configured deadline plus grace/cleanup allowance. **Not claimed:** containment
+of a deliberately detached daemon (e.g. a double-forked process that leaves
+the group via `setsid`) — that requires an outer sandbox/supervisor boundary,
+which this harness does not provide. Windows has no process-group kill
+primitive here and falls back to signalling only the direct child; this is a
+documented platform limitation, not process-tree cancellation.
+
 ## Output artifacts and recovery
 
-Every captured tool result is stored whole as an artifact before any reduced view
-is presented, so nothing the model was not shown is lost. Two always-available
-tools recover it without rerunning the command:
+Every captured tool result — success or a thrown tool error, including empty
+output — is stored whole, as separate named streams (`stdout`/`stderr` for
+`bash`, a single `output` stream for everything else), before any reduced
+view is presented, so nothing the model was not shown is lost. The bash
+tool's own capture limit is a per-stream byte cap (256,000 bytes), decoupled
+from the much smaller character budget used for what's actually displayed —
+a 60,000-character capture is never marked complete after silently losing
+characters to a display-oriented cap, and a `read` beyond its size limit is
+read with bounded streaming, never loaded whole into memory first. Whitespace
+is preserved; `(no output)` is presentation wording substituted at delivery
+time, never baked into the archived capture.
+
+Artifacts are stored per session, under
+`<journal-parent>/sessions/<sessionId>/artifacts` (the session id comes from
+`SessionRecorder`, never a timestamp-only directory name). Every artifact is
+stamped with its owning session and validated on every read; a malformed or
+foreign id is rejected before any filesystem path is ever derived from it.
+Two sessions sharing a journal parent directory can never read or evict each
+other's artifacts. Tombstones (evicted-but-remembered metadata) are bounded
+by a retention horizon; beyond it a purged id reports "unknown" rather than
+"expired" — the store genuinely no longer has evidence to distinguish the
+two. Pre-existing artifacts from the old shared-directory layout are neither
+migrated nor deleted by this change; a new session simply never reads them.
+
+Two always-available tools recover a capture without rerunning the command:
 
 ```
-read_output({ id, startLine, lineCount })
-search_output({ id, pattern, limit })
+read_output({ id, stream?, startLine, lineCount, startByteInLine? })
+search_output({ id, stream?, pattern, limit, startLine? })
 ```
 
-Responses carry their real source ranges and completeness markers, and pass
-through the same sanitize path as any other tool result. Unknown ID, evicted
-artifact, capture truncation, and empty source are distinct outcomes — never a
-bare "no output". The store is bounded per session and evicts by age.
+Responses carry their real source ranges (or, for a single line too large for
+one page, an explicit UTF-8 byte range and a `startByteInLine` continuation
+value) and completeness markers, and pass through the same bounded
+presentation and sanitize path as any other tool result — including hostile
+content in a late recovery page. Unknown ID, unknown stream, evicted artifact,
+capture truncation, and empty source are distinct outcomes — never a bare "no
+output". `search_output`'s `startLine` resumes a prior truncated scan from
+where it left off (via the `scannedTo` receipt) without re-scanning or gaps.
 
 ## Focus rollout
 

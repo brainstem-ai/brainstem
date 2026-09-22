@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
@@ -310,5 +310,94 @@ describe("approval lifecycle", () => {
     expect(updates.length).toBe(1);
     expect(updates[0]!.text).toBe("stop after this command");
     expect(approvalEvents(events).some((e) => e.status === "approved")).toBe(true);
+  });
+});
+
+const WRITE_CALL = (id: string, path: string, content: string): AssistantMessage =>
+  assistantMessage([{ type: "toolCall", id, name: "write", arguments: { path, content } }], "toolUse");
+
+describe("R3: immutable, action-specific approvals for writes", () => {
+  test("the approval request shows the actual proposed diff, not just command/path", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-approval-r3-"));
+    writeFileSync(join(dir, "app.ts"), "const port = 3000;\n");
+    const journalPath = join(dir, "journal.ndjson");
+    let seenRequest: ApprovalRequest | undefined;
+
+    const harness = createHarness({
+      systemOne: askUserSystemOne(),
+      streamFn: scriptedStream([WRITE_CALL("tc1", "app.ts", "const port = 8080;\n"), DONE]),
+      model: undefined as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+      approvalHandler: async (req) => {
+        seenRequest = req;
+        return "deny";
+      },
+    });
+
+    await harness.prompt("bump the port");
+
+    expect(seenRequest?.changeSummary).toContain("-const port = 3000;");
+    expect(seenRequest?.changeSummary).toContain("+const port = 8080;");
+    expect(seenRequest?.target).toContain("app.ts");
+  });
+
+  test("a file edited between approval request and resolution invalidates the approval instead of executing the stale write", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-approval-r3-"));
+    const target = join(dir, "config.json");
+    writeFileSync(target, '{"port":3000}');
+    const journalPath = join(dir, "journal.ndjson");
+
+    const harness = createHarness({
+      systemOne: askUserSystemOne(),
+      streamFn: scriptedStream([WRITE_CALL("tc1", "config.json", '{"port":8080}'), DONE]),
+      model: undefined as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+      approvalHandler: async () => {
+        // Simulate a concurrent edit landing while the human is still looking
+        // at the (now-stale) diff.
+        writeFileSync(target, '{"port":9999,"editedConcurrently":true}');
+        return "approve_once";
+      },
+    });
+
+    await harness.prompt("bump the port");
+
+    // The write must NOT have executed against the stale approved content.
+    expect(readFileSync(target, "utf8")).toBe('{"port":9999,"editedConcurrently":true}');
+    const approvals = approvalEvents(eventsOf(harness.journalPath));
+    expect(approvals.map((e) => e.status)).toEqual(["requested", "invalidated"]);
+    const result = toolResultOf(harness, "tc1");
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("changed since approval was requested");
+  });
+
+  test("approving a write with one content payload never permits a different payload (distinct action hashes)", async () => {
+    async function actionHashFor(content: string): Promise<string> {
+      dir = mkdtempSync(join(tmpdir(), "brainstem-approval-r3-"));
+      const journalPath = join(dir, "journal.ndjson");
+      const harness = createHarness({
+        systemOne: askUserSystemOne(),
+        streamFn: scriptedStream([WRITE_CALL("tc1", "new-file.txt", content), DONE]),
+        model: undefined as never,
+        trust: 0.3,
+        journalPath,
+        cwd: dir,
+        approvalHandler: async () => "deny",
+      });
+      await harness.prompt("write a file");
+      const approvals = approvalEvents(eventsOf(harness.journalPath));
+      const hash = approvals[0]!.actionHash;
+      rmSync(dir, { recursive: true, force: true });
+      dir = "";
+      return hash;
+    }
+
+    const hashA = await actionHashFor("content A");
+    const hashB = await actionHashFor("content B");
+    expect(hashA).not.toBe(hashB);
   });
 });

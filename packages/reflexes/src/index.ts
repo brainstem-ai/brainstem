@@ -5,6 +5,8 @@ import {
   newId,
   splitIntoSections,
   getBit,
+  boundForReview,
+  REVIEW_CHAR_CAP,
   type SystemOne,
   type Policy,
   type Journal,
@@ -16,9 +18,11 @@ import {
   type FocusInput,
   type FocusMode,
   type AskResult,
+  type BoundedText,
 } from "@brainstem/core";
 
-export type { SystemOne, GateInput, GateDecision, ObserveToolResultInput, SanitizeDecision, VerifyDecision, FocusMode, AskResult };
+export type { SystemOne, GateInput, GateDecision, ObserveToolResultInput, SanitizeDecision, VerifyDecision, FocusMode, AskResult, BoundedText };
+export { boundForReview, REVIEW_CHAR_CAP };
 export { jevJudge } from "./judges/jev";
 export { genericJudge } from "./judges/generic";
 

@@ -209,8 +209,10 @@ Usage:
       console.error(`[brainstem] approval needed: ${req.tool}`);
       if (reqArgs.command !== undefined) console.error(`  command: ${reqArgs.command}`);
       if (reqArgs.path !== undefined) console.error(`  path: ${reqArgs.path}`);
+      if (req.target !== undefined) console.error(`  target: ${req.target}`);
       console.error(`  cwd: ${req.cwd}`);
       console.error(`  reasons: ${req.reasons.join("; ")}`);
+      if (req.changeSummary !== undefined) console.error(`  change:\n${req.changeSummary}`);
       console.error(
         `approve once? y/yes/approve · n/no/deny or empty line denies · any other input is queued as a task update · ctrl+d cancels`,
       );

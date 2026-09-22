@@ -2,6 +2,7 @@ import { checkBudgets, type BudgetCheck, type BudgetLimits } from "./budgets";
 import { createBitmap, popcount, type CapabilityBitmap } from "./bitmap";
 import { computeCacheKey, type AnswerCache } from "./cache";
 import { hashAction, newId } from "./evidence";
+import { boundForReview, REVIEW_CHAR_CAP } from "./presentation";
 import type { CapabilityCatalog } from "./capabilities";
 import type { ToolStatus } from "./evidence";
 import { JevCancelledError, JevUnavailableError } from "./errors";
@@ -102,7 +103,10 @@ export interface SteerOptions {
   resolveModelId?: (tier: SteerTier) => string;
 }
 
-const CONTENT_CAP = 8_000;
+// Kept as an alias so existing call sites and journal fields referencing
+// "content cap" still resolve to the one shared review boundary in
+// ./presentation, rather than a second independently-maintained number.
+const CONTENT_CAP = REVIEW_CHAR_CAP;
 const INTENT_CAP = 300;
 
 export interface ObservationEnvelope {
@@ -132,8 +136,12 @@ export function buildEnvelope(input: ObserveToolResultInput): ObservationEnvelop
     actionSummary: input.actionSummary,
     intent: (input.intent ?? input.actionSummary).slice(0, INTENT_CAP),
     status: input.status ?? "ok",
-    truncated: input.truncated ?? false,
-    content: input.content.slice(0, CONTENT_CAP),
+    // A caller-supplied envelope is already expected to be pre-bounded by the
+    // single presentation boundary (see ./presentation); this is a defensive
+    // backstop, not a second independent slice — if it ever fires, the
+    // envelope inherits the truncation the caller may not have reported.
+    truncated: input.truncated ?? boundForReview(input.content, CONTENT_CAP).truncated,
+    content: boundForReview(input.content, CONTENT_CAP).text,
   };
 }
 
