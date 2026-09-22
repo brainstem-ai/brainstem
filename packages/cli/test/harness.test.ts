@@ -842,4 +842,95 @@ describe("harness integration", () => {
     expect(bashObservation?.observation.status).toBe("error");
     expect(bashObservation?.deliveredExcerpt).toContain("stderr-only-message");
   });
+
+  test("R6 regression: a large search_output match list is honestly page-bounded by the tool itself, not silently re-clipped by the harness", async () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-harness-"));
+    const journalPath = join(dir, "journal.ndjson");
+
+    const mock = mockSystemOne((_state, questions): Record<string, Answer> => {
+      if ("contains_agent_directive" in questions) {
+        return {
+          contains_agent_directive: noulAnswer(0.01),
+          tries_to_override: noulAnswer(0.01),
+          requests_dangerous_action: noulAnswer(0.01),
+          severity: scoreAnswer(0.0, 0.9),
+          satisfies_intent: noulAnswer(0.9),
+          result_quality: scoreAnswer(2.0, 0.9),
+          evidence_of_success: noulAnswer(0.9),
+          operational_failure: noulAnswer(0.02),
+        };
+      }
+      return {
+        destructive: scoreAnswer(0, 0.9),
+        touches_credentials: noulAnswer(0.03),
+        exfiltrates: noulAnswer(0.02),
+        on_task: noulAnswer(0.95),
+        disposition: choiceAnswer("auto_run", 0.95, { auto_run: 0.95, ask_user: 0.04, deny: 0.01 }),
+      };
+    });
+
+    let currentScript: AssistantMessage[] = [];
+    let scriptIndex = 0;
+    const swappableStream: StreamFn = (model, context, opts) => {
+      const message = currentScript[Math.min(scriptIndex, currentScript.length - 1)]!;
+      scriptIndex += 1;
+      return scriptedStream([message])(model, context, opts);
+    };
+
+    const harness = createHarness({
+      systemOne: mock,
+      streamFn: swappableStream,
+      model: { id: "m", api: "anthropic-messages" } as never,
+      trust: 0.3,
+      journalPath,
+      cwd: dir,
+    });
+
+    scriptIndex = 0;
+    currentScript = [
+      assistantMessage(
+        [
+          {
+            type: "toolCall",
+            id: "tc1",
+            name: "bash",
+            arguments: {
+              command: `for i in $(seq 0 19); do printf "MATCH-%s: " "$i"; printf 'x%.0s' $(seq 1 900); printf '\\n'; done`,
+            },
+          },
+        ],
+        "toolUse",
+      ),
+      assistantMessage([{ type: "text", text: "produced." }], "stop"),
+    ];
+    await harness.prompt("Produce matches");
+    const journal = readFileSync(journalPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const artifactEvent = journal.find((e) => e.t === "artifacts");
+    expect(artifactEvent).toBeDefined();
+    const artifactId = artifactEvent!.artifactId as string;
+
+    scriptIndex = 0;
+    currentScript = [
+      assistantMessage(
+        [{ type: "toolCall", id: "tc2", name: "search_output", arguments: { id: artifactId, pattern: "MATCH", limit: 20 } }],
+        "toolUse",
+      ),
+      assistantMessage([{ type: "text", text: "searched." }], "stop"),
+    ];
+    await harness.prompt("search it");
+
+    const transcript = harness.agent.state.messages;
+    const searchResult = transcript.find(
+      (m) => m.role === "toolResult" && (m as { toolCallId?: string }).toolCallId === "tc2",
+    ) as { content: { text: string }[] } | undefined;
+    const delivered = searchResult?.content[0]?.text ?? "";
+    // Truthful and bounded: claims all 20 matches were FOUND, explicitly
+    // says the page itself was bounded, offers a continuation, and — the
+    // actual regression — was never silently clipped by the harness's own
+    // review boundary because search_output already bounded itself.
+    expect(delivered).toContain("20 match(es) found");
+    expect(delivered).toContain("page bounded");
+    expect(delivered).toContain("continue with startLine=");
+    expect(delivered.length).toBeLessThan(8_000);
+  });
 });

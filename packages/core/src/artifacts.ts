@@ -88,19 +88,25 @@ export function sliceByLines(
 // capture cannot turn search_output into a hang; matches are capped at `limit`.
 const MAX_SCAN_CHARS = 1_000_000;
 
-export function searchContent(
-  content: string,
-  pattern: string,
-  limit = 50,
-): { matches: { line: number; text: string }[]; totalMatches: number; truncated: boolean } {
+export interface SearchResult {
+  matches: { line: number; text: string }[];
+  totalMatches: number;
+  truncated: boolean;
+  /** True only when MAX_SCAN_CHARS cut the input short — distinct from `truncated`, which is also set by an ordinary `limit`. */
+  scanClipped: boolean;
+  /** Lines actually scanned within the given `content` — may be fewer than its total line count when `scanClipped` is true. A caller computing a coverage receipt must use this, not the line count of its own unclipped input, or it will overstate how much was actually searched. */
+  scannedLines: number;
+}
+
+export function searchContent(content: string, pattern: string, limit = 50): SearchResult {
   let re: RegExp;
   try {
     re = new RegExp(pattern);
   } catch (cause) {
     throw new InvalidPatternError(pattern, cause);
   }
-  const clipped = content.length > MAX_SCAN_CHARS;
-  const lines = splitLines(clipped ? content.slice(0, MAX_SCAN_CHARS) : content);
+  const scanClipped = content.length > MAX_SCAN_CHARS;
+  const lines = splitLines(scanClipped ? content.slice(0, MAX_SCAN_CHARS) : content);
   const cap = Math.max(0, Math.floor(limit));
   const matches: { line: number; text: string }[] = [];
   let totalMatches = 0;
@@ -109,7 +115,7 @@ export function searchContent(
     totalMatches += 1;
     if (matches.length < cap) matches.push({ line: i + 1, text: lines[i]! });
   }
-  return { matches, totalMatches, truncated: totalMatches > matches.length || clipped };
+  return { matches, totalMatches, truncated: totalMatches > matches.length || scanClipped, scanClipped, scannedLines: lines.length };
 }
 
 export function contentHash(content: string): string {
