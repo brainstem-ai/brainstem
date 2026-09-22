@@ -1,6 +1,7 @@
 {
   "name": "brainstem",
   "private": true,
+  "packageManager": "bun@1.4.2",
   "workspaces": ["packages/*"],
   "scripts": {
     "exp:access": "bun run experiments/01-access.ts",
@@ -15,14 +16,14 @@
     "eval:with-without": "bun run experiments/evals/with-without-harness.ts",
     "eval:focus-vs-rtk": "bun run experiments/evals/focus-vs-rtk.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/typecheck.tsbuildinfo -p tsconfig.json"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0"
   },
   "devDependencies": {
-    "bun-types": "^1.4.2",
-    "typescript": "^5.9.0",
+    "@types/bun": "1.4.2",
+    "typescript": "7.0.2",
     "vitest": "^3.2.0"
   },
   "trustedDependencies": [
