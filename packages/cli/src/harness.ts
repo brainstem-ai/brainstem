@@ -581,6 +581,47 @@ export function createHarness(options: HarnessOptions): Harness {
           }
         }
 
+        // Computed once, right after the write target is verified, so
+        // EVERY approval path below (outside-root static-floor ask, and the
+        // normal Jev-decided ask) shows the same real diff/content summary
+        // and binds to the same preimage — not just the path that happens
+        // to reach Jev. A stale/missing prepared-action protection on one
+        // branch was the R3 gap: identity/preimage checks must be uniform
+        // across every way an approval can be requested.
+        const change =
+          toolCall.name === "write"
+            ? changeSummaryForWrite(options.cwd, a.path ?? "", (args as { content?: string } | undefined)?.content ?? "")
+            : undefined;
+        const writeApprovalPrepared = (): {
+          target: string;
+          changeSummary?: string;
+          preconditionDigest?: string;
+          recheck: () => { changed: boolean; reason: string };
+        } => {
+          const target = writeCheck!.resolvedTarget;
+          return {
+            target,
+            changeSummary: change?.changeSummary,
+            preconditionDigest: change?.existingDigest,
+            recheck: () => {
+              const recheck = checkWriteTarget(options.cwd, a.path ?? "");
+              if (!recheck.ok || recheck.resolvedTarget !== target) {
+                return { changed: true, reason: "write target changed since approval was requested" };
+              }
+              let currentDigest: string;
+              try {
+                currentDigest = contentHash(readFileSync(target, "utf8"));
+              } catch {
+                currentDigest = ABSENT_DIGEST;
+              }
+              if (currentDigest !== (change?.existingDigest ?? ABSENT_DIGEST)) {
+                return { changed: true, reason: "file contents changed since approval was requested" };
+              }
+              return { changed: false, reason: "" };
+            },
+          };
+        };
+
         // Literal containment is decided in code, never by a judgment: a write whose
         // resolved target leaves the configured root takes the static floor verdict
         // and never reaches Jev.
@@ -602,15 +643,9 @@ export function createHarness(options: HarnessOptions): Harness {
             emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
             return { block: true, reason };
           }
-          return await runApproval(toolCallId, toolCall.name, args, [why], signal, {
-            target: writeCheck!.resolvedTarget,
-          });
+          return await runApproval(toolCallId, toolCall.name, args, [why], signal, writeApprovalPrepared());
         }
 
-        const change =
-          toolCall.name === "write"
-            ? changeSummaryForWrite(options.cwd, a.path ?? "", (args as { content?: string } | undefined)?.content ?? "")
-            : undefined;
         const decision = await timedJev(() =>
           engine.gate({
             tool: toolCall.name,
@@ -628,31 +663,7 @@ export function createHarness(options: HarnessOptions): Harness {
           return { block: true, reason };
         }
         if (decision.action === "ask") {
-          const prepared =
-            toolCall.name === "write"
-              ? {
-                  target: writeCheck!.resolvedTarget,
-                  changeSummary: change?.changeSummary,
-                  preconditionDigest: change?.existingDigest,
-                  recheck: () => {
-                    const target = writeCheck!.resolvedTarget;
-                    const recheck = checkWriteTarget(options.cwd, a.path ?? "");
-                    if (!recheck.ok || recheck.resolvedTarget !== target) {
-                      return { changed: true, reason: "write target changed since approval was requested" };
-                    }
-                    let currentDigest: string;
-                    try {
-                      currentDigest = contentHash(readFileSync(target, "utf8"));
-                    } catch {
-                      currentDigest = ABSENT_DIGEST;
-                    }
-                    if (currentDigest !== (change?.existingDigest ?? ABSENT_DIGEST)) {
-                      return { changed: true, reason: "file contents changed since approval was requested" };
-                    }
-                    return { changed: false, reason: "" };
-                  },
-                }
-              : {};
+          const prepared = toolCall.name === "write" ? writeApprovalPrepared() : {};
           return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal, prepared);
         }
         return undefined;

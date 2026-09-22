@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
@@ -399,5 +399,58 @@ describe("R3: immutable, action-specific approvals for writes", () => {
     const hashA = await actionHashFor("content A");
     const hashB = await actionHashFor("content B");
     expect(hashA).not.toBe(hashB);
+  });
+
+  test("R3 regression: the outside-root static-floor approval path shows the real diff and enforces the same preimage precondition as the normal ask path", async () => {
+    // Deliberately NOT under os.tmpdir(): on macOS that resolves beneath
+    // /private/var, which the floor denies outright as a system directory
+    // before ever reaching "ask" — this test is about the ordinary
+    // outside-the-root ask case, so the scratch root lives inside the repo
+    // working tree instead (mirroring the independent-validation repro).
+    const workspaceScratch = mkdtempSync(join(process.cwd(), ".test-scratch-r3-outside-"));
+    try {
+      const root = join(workspaceScratch, "repo");
+      const outsideDir = join(workspaceScratch, "outside");
+      mkdirSync(root);
+      mkdirSync(outsideDir);
+      const target = join(outsideDir, "file.txt");
+      writeFileSync(target, "original");
+      const journalPath = join(workspaceScratch, "journal.ndjson");
+      let seenRequest: ApprovalRequest | undefined;
+
+      // A write outside the project root is decided by the static floor in
+      // code — never reaches Jev's gate — but the outside-root branch used
+      // to build its approval request from just `target`, omitting
+      // changeSummary and the preimage precondition that the normal
+      // (in-root) ask path already had.
+      const harness = createHarness({
+        systemOne: askUserSystemOne(),
+        streamFn: scriptedStream([WRITE_CALL("tc1", "../outside/file.txt", "approved-new"), DONE]),
+        model: undefined as never,
+        trust: 0.3,
+        journalPath,
+        cwd: root,
+        approvalHandler: async (req) => {
+          seenRequest = req;
+          // Concurrent edit while the human is still looking at the (now
+          // stale) diff — mirrors the in-root precondition test above.
+          writeFileSync(target, "concurrent edit");
+          return "approve_once";
+        },
+      });
+
+      await harness.prompt("write outside the project");
+
+      expect(seenRequest?.changeSummary).toContain("original");
+      expect(seenRequest?.target).toContain("file.txt");
+
+      // The write must NOT have executed against the stale approved content —
+      // the same precondition recheck the in-root ask path already enforced.
+      expect(readFileSync(target, "utf8")).toBe("concurrent edit");
+      const approvals = approvalEvents(eventsOf(harness.journalPath));
+      expect(approvals.map((e) => e.status)).toEqual(["requested", "invalidated"]);
+    } finally {
+      rmSync(workspaceScratch, { recursive: true, force: true });
+    }
   });
 });
