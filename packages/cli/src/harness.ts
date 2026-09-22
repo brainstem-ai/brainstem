@@ -214,8 +214,15 @@ export function createHarness(options: HarnessOptions): Harness {
   const registry = options.registry ?? new CapabilityRegistry();
   const driver = new SelectDriver({ registry, engine, minRefreshIntervalMs: 0 });
 
+  // Keyed by toolCallId: set by the write gate flow below right before a
+  // write is allowed to proceed (auto or approved), consumed once by the
+  // write tool's own execute() — see tools.ts's ToolDeps.writePreconditions
+  // doc comment for why this is the only channel available to bind a
+  // write's preimage through to execution.
+  const writePreconditions = new Map<string, string>();
+
   const tools: AgentTool[] = [
-    ...makeTools({ cwd: options.cwd }),
+    ...makeTools({ cwd: options.cwd, writePreconditions }),
     ...makeRecoveryTools({ store: artifactStore }),
     makeDiscoveryTool({
       registry,
@@ -622,6 +629,23 @@ export function createHarness(options: HarnessOptions): Harness {
           };
         };
 
+        // For a write: sets writePreconditions[toolCallId] to the digest the
+        // target's content was just verified to still match, immediately
+        // before allowing execution — the ONE channel the write tool's own
+        // execute() can read it back from (see tools.ts's ToolDeps doc
+        // comment). Consumed once by the descriptor-relative executor,
+        // binding the write's PREIMAGE through execution the same way its
+        // TARGET is bound through execution.
+        const runWriteApproval = async (
+          reasons: string[],
+        ): Promise<{ block: true; reason: string } | undefined> => {
+          const result = await runApproval(toolCallId, toolCall.name, args, reasons, signal, writeApprovalPrepared());
+          if (result === undefined) {
+            writePreconditions.set(toolCallId, change?.existingDigest ?? ABSENT_DIGEST);
+          }
+          return result;
+        };
+
         // Literal containment is decided in code, never by a judgment: a write whose
         // resolved target leaves the configured root takes the static floor verdict
         // and never reaches Jev.
@@ -643,7 +667,7 @@ export function createHarness(options: HarnessOptions): Harness {
             emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
             return { block: true, reason };
           }
-          return await runApproval(toolCallId, toolCall.name, args, [why], signal, writeApprovalPrepared());
+          return await runWriteApproval([why]);
         }
 
         const decision = await timedJev(() =>
@@ -663,8 +687,8 @@ export function createHarness(options: HarnessOptions): Harness {
           return { block: true, reason };
         }
         if (decision.action === "ask") {
-          const prepared = toolCall.name === "write" ? writeApprovalPrepared() : {};
-          return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal, prepared);
+          if (toolCall.name === "write") return await runWriteApproval(decision.reasons);
+          return await runApproval(toolCallId, toolCall.name, args, decision.reasons, signal, {});
         }
 
         // "auto": bind execution to the target/preimage captured above. Jev
@@ -675,7 +699,10 @@ export function createHarness(options: HarnessOptions): Harness {
         // judgment came back favorable for the ORIGINAL target. This closes
         // the same class of gap R3's approval recheck closes for the "ask"
         // path, for the "auto" path, where nothing else re-verifies
-        // anything between gate and execution.
+        // anything between gate and execution. writePreconditions is set
+        // here too — the write tool's execute() binds its own descriptor-
+        // relative walk to the SAME preimage this recheck just confirmed,
+        // not just to a recheck result that execute() can never see.
         if (toolCall.name === "write") {
           const recheck = writeApprovalPrepared().recheck();
           if (recheck.changed) {
@@ -694,6 +721,7 @@ export function createHarness(options: HarnessOptions): Harness {
             emitBlockedObservation(toolCallId, toolCall.name, args, reason, `gate deny: ${why}`);
             return { block: true, reason };
           }
+          writePreconditions.set(toolCallId, change?.existingDigest ?? ABSENT_DIGEST);
         }
         return undefined;
       }

@@ -16,6 +16,18 @@ export interface ToolDeps {
   killGraceMs?: number;
   /** Extra bound on waiting for stdio pipes to close after SIGKILL, so a lingering descendant cannot hang the tool call. */
   drainGraceMs?: number;
+  /**
+   * Side-channel keyed by toolCallId, set by the harness's gate right
+   * before it allows a write to proceed (whether auto-approved or
+   * human-approved) and consumed once here. Pi's beforeToolCall/execute
+   * contract has no other way to pass the digest a write was AUTHORIZED
+   * against into its own execute() call — toolCallId is the one identifier
+   * both sides already share. Binds the write's PREIMAGE through execution,
+   * the same way writeFileVerified's descriptor-relative executor already
+   * binds its TARGET through execution. Absent (no harness, or a direct
+   * caller) simply skips the preimage check.
+   */
+  writePreconditions?: Map<string, string>;
 }
 
 /** Bounded file read: reads at most `capBytes` from disk without loading the whole file, and never splits a UTF-8 sequence at the boundary. */
@@ -343,14 +355,18 @@ export function makeTools(deps: ToolDeps): AgentTool[] {
     label: "Write File",
     description: "Create or overwrite a file with the given content.",
     parameters: writeParams,
-    execute: async (_id, params) => {
-      // The tool is itself a "managed executor" for R2/R3: it resolves and
-      // verifies the same canonical target the gate/approval layer checked,
-      // and writes through an atomic verified path rather than a bare
-      // join(cwd, path) + writeFileSync that could target a symlink the
-      // gate never saw. This runs even when the harness's own gate already
-      // checked the same thing, as defense in depth for direct callers.
-      const result = writeFileVerified(deps.cwd, params.path, params.content);
+    execute: async (id, params) => {
+      // The tool IS the execution boundary for R2/R3, not a preflight
+      // recheck layered in front of one: writeFileVerified resolves and
+      // verifies the target through a descriptor-relative executor (when
+      // available) that a concurrent symlink swap cannot redirect, and — if
+      // the harness supplied one for this exact toolCallId — verifies the
+      // file's preimage digest inside that SAME verified boundary too. This
+      // runs even when the harness's own gate already checked the same
+      // thing, as defense in depth for direct callers.
+      const expectedPreimageDigest = deps.writePreconditions?.get(id);
+      deps.writePreconditions?.delete(id); // one-shot: never reused across retries or unrelated calls
+      const result = writeFileVerified(deps.cwd, params.path, params.content, { expectedPreimageDigest });
       if (!result.ok) {
         throw new Error(`write blocked: ${result.reason}`);
       }
