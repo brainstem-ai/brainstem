@@ -286,6 +286,52 @@ describe("attachReflexes — focus", () => {
     expect(result?.content[0]?.text).toContain("BETA");
     expect(result?.content[0]?.text).not.toContain("ALPHA");
   });
+
+  test("R1 regression: Sanitize reviews the FOCUSED view, not the pre-Focus raw capture (capture -> focus -> bounded presentation -> review -> delivery)", async () => {
+    const sanitizeInputs: string[] = [];
+    const mock = mockSystemOne((state, questions) => {
+      if ("contains_agent_directive" in questions) {
+        sanitizeInputs.push(String((state as { content?: string }).content ?? ""));
+        return BENIGN_SANITIZE();
+      }
+      if (Object.keys(questions).some((k) => k.startsWith("focus__"))) {
+        const answers: Record<string, Answer> = {};
+        for (const [id, q] of Object.entries(questions)) {
+          const relevant = "instructions" in q && q.instructions.includes("BETA");
+          answers[id] = noulAnswer(relevant ? 0.9 : 0.05);
+        }
+        return answers;
+      }
+      return AUTO_GATE();
+    });
+    const reflexes = createReflexes({ judge: mock, root: "/tmp" });
+    const agent = new Agent({
+      initialState: { systemPrompt: "test", model: undefined as never, tools: [stubTool("read", bigContent)], thinkingLevel: "low" },
+      streamFn: scriptedStream([
+        assistantMessage([{ type: "toolCall", id: "tc1", name: "read", arguments: { path: "log.txt" } }], "toolUse"),
+        assistantMessage([{ type: "text", text: "done" }], "stop"),
+      ]),
+      toolExecution: "sequential",
+    });
+
+    attachReflexes(agent, reflexes, { cwd: "/tmp", focusMode: "on" });
+    await agent.prompt("go");
+
+    expect(sanitizeInputs.length).toBeGreaterThan(0);
+    // Sanitize must have been shown the post-Focus view: ALPHA was excluded
+    // by Focus, so it must never appear in what Sanitize reviewed either —
+    // if Focus ran AFTER Sanitize (the old, wrong order), Sanitize would
+    // have seen the full pre-Focus content instead.
+    for (const seen of sanitizeInputs) {
+      expect(seen).not.toContain("ALPHA");
+    }
+    expect(sanitizeInputs.some((seen) => seen.includes("BETA"))).toBe(true);
+
+    // The final delivered text is never longer than what Sanitize reviewed.
+    const delivered = toolResult(agent, "tc1")?.content[0]?.text ?? "";
+    const reviewedLength = sanitizeInputs.reduce((max, s) => Math.max(max, s.length), 0);
+    expect(delivered.length).toBeLessThanOrEqual(reviewedLength + 500); // + trusted harness notice overhead only
+  });
 });
 
 describe("attachReflexes — scoping and errors", () => {
