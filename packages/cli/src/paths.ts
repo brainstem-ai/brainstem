@@ -1,5 +1,5 @@
 import { basename, dirname, join } from "node:path";
-import { lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { isInside, resolveParentForWrite, resolvePath } from "@brainstem/core";
 
@@ -38,6 +38,8 @@ export interface WriteTargetCheck {
   ok: boolean;
   resolvedTarget: string;
   reason?: string;
+  /** Permission bits of the file currently at resolvedTarget, when one exists — read via the SAME lstat used to reject a symlink, so it's never a second, separately racy stat. Absent when nothing exists there yet. */
+  existingMode?: number;
 }
 
 /**
@@ -69,7 +71,7 @@ export function checkWriteTarget(root: string, target: string): WriteTargetCheck
       reason: `refusing to write "${target}": an existing non-regular file occupies that path`,
     };
   }
-  return { ok: true, resolvedTarget };
+  return { ok: true, resolvedTarget, ...(st ? { existingMode: st.mode & 0o777 } : {}) };
 }
 
 export type WriteResult = { ok: true; resolvedTarget: string; bytesWritten: number } | { ok: false; reason: string };
@@ -81,6 +83,16 @@ export type WriteResult = { ok: true; resolvedTarget: string; bytesWritten: numb
  * the race window between the check below and this call is not followed —
  * worst case the rename replaces the symlink's own directory entry, which
  * still cannot write outside the intended directory.
+ *
+ * An existing file's permission bits are preserved on the replacement: the
+ * temp file is created with the process's default mode (subject to umask),
+ * then explicitly chmod'd to the prior file's mode — read from the SAME
+ * lstat that already rejected a symlink there, never a fresh path-based
+ * stat — before the rename makes it visible at the real path. This does not
+ * reopen the hardlink/symlink hazards atomic replacement exists to close:
+ * the chmod targets the freshly-created temp file by its own path (never
+ * the original target), so it can't be tricked into changing an unrelated
+ * file's permissions.
  */
 export function writeFileVerified(root: string, target: string, content: string): WriteResult {
   const check = checkWriteTarget(root, target);
@@ -101,6 +113,9 @@ export function writeFileVerified(root: string, target: string, content: string)
   const tmp = join(dir, `.${base}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
   writeFileSync(tmp, content, { encoding: "utf8", flag: "wx" });
   try {
+    if (recheck.existingMode !== undefined) {
+      chmodSync(tmp, recheck.existingMode);
+    }
     renameSync(tmp, recheck.resolvedTarget);
   } catch (err) {
     try {

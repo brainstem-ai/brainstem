@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkWriteTarget, isInside, resolveParentForWrite, resolvePath, writeFileVerified } from "../src/paths";
@@ -150,6 +150,33 @@ describe("R2: checkWriteTarget / writeFileVerified — bind the check to the act
     const result = writeFileVerified(dir, "new/nested/file.txt", "hello");
     expect(result.ok).toBe(true);
     expect(readFileSync(join(dir, "new", "nested", "file.txt"), "utf8")).toBe("hello");
+  });
+
+  test("P2/R2 regression: an atomic replacement preserves the existing file's permission bits, not the process default", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const privatePath = join(dir, "private.txt");
+    writeFileSync(privatePath, "before");
+    chmodSync(privatePath, 0o600);
+    const executable = join(dir, "script.sh");
+    writeFileSync(executable, "before");
+    chmodSync(executable, 0o755);
+
+    expect(writeFileVerified(dir, "private.txt", "after").ok).toBe(true);
+    expect(writeFileVerified(dir, "script.sh", "after").ok).toBe(true);
+
+    expect(statSync(privatePath).mode & 0o777).toBe(0o600);
+    expect(statSync(executable).mode & 0o777).toBe(0o755);
+    expect(readFileSync(privatePath, "utf8")).toBe("after");
+    expect(readFileSync(executable, "utf8")).toBe("after");
+  });
+
+  test("P2/R2: a brand-new file gets the process default mode, not a preserved one (nothing existed to preserve)", () => {
+    dir = mkdtempSync(join(tmpdir(), "brainstem-paths-r2-"));
+    const result = writeFileVerified(dir, "new.txt", "content");
+    expect(result.ok).toBe(true);
+    // No prior file existed, so this is just documenting there's no crash
+    // and a real (nonzero) mode is set — not asserting a specific umask.
+    expect(statSync(join(dir, "new.txt")).mode & 0o777).toBeGreaterThan(0);
   });
 
   test("a sibling-prefix path is not treated as inside the root", () => {
