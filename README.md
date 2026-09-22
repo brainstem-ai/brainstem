@@ -78,14 +78,25 @@ write whose final path component is a symlink — existing (inside or outside
 the root) or dangling — with an explicit blocked outcome, before Jev ever sees
 it. The write itself lands via a same-directory temp file + atomic rename,
 which never dereferences a destination symlink and never truncates a
-hard-linked file's shared inode in place.
+hard-linked file's shared inode in place; an existing file's permission bits
+are preserved onto the replacement rather than reset to the process default.
 
-**Supported guarantee:** final-symlink rejection and hardlink-safe atomic
-replacement are structural (kernel-enforced by `O_*`/`rename()` semantics),
+The harness also binds execution to the specific target and file content it
+resolved *before* asking Jev: since a Jev call is an await point, it rechecks
+target identity and a preimage digest immediately after the gate decision
+returns, for every outcome (not just "ask" — an "auto" decision gets the same
+check). A parent directory swapped for a symlink, or the file edited, while
+that call was in flight is caught there rather than silently followed.
+
+**Supported guarantee:** final-symlink rejection, hardlink-safe atomic
+replacement, permission preservation, and binding an "auto" or "ask" decision
+to the pre-Jev-call target/preimage are structural or explicitly re-verified,
 not probabilistic. **Not claimed:** full descriptor-relative (`openat`-style)
 traversal — Bun/Node expose no public API for it — so a symlink substituted
-into an *intermediate* ancestor directory between path resolution and the
-final rename is a real, unclosed TOCTOU window on this platform. Closing it
+into an *intermediate* ancestor directory in the residual window between the
+harness's own `beforeToolCall` hook returning and the tool's `execute()`
+actually running (Pi's hook architecture provides no side-channel to close
+this further) is a real, unclosed TOCTOU window on this platform. Closing it
 fully requires a native addon or an external sandboxing executor; this
 release does not claim that guarantee, per the review remediation plan's
 explicit escape hatch (see `docs/plans/2026-09-22-review-remediation.md`, R2).
@@ -95,17 +106,33 @@ explicit escape hatch (see `docs/plans/2026-09-22-review-remediation.md`, R2).
 The `bash` tool launches commands in their own POSIX process group (via
 `detached: true`) and, on timeout or cancellation, signals the whole group —
 not just the immediate shell — with SIGTERM, a short configurable grace
-period, then SIGKILL. Pipe drainage is bounded past that point so a lingering
-descendant cannot hang the tool call indefinitely.
+period, then SIGKILL. SIGKILL is sent as soon as the direct child's own exit
+is observed (or the grace period elapses, whichever comes first) — not tied
+to whether that child's stdio has also closed, since a backgrounded job with
+redirected stdio can outlive the shell that spawned it while remaining in the
+same group. Pipe drainage is separately bounded past that point so a
+lingering or detached descendant holding a pipe open cannot hang the tool
+call indefinitely.
+
+Two runtime specifics this relies on: process exit is detected via the
+ChildProcess `"exit"` event, not `"close"` (`"close"` additionally waits for
+stdio to end, which never happens if a descendant inherited those same pipe
+fds without redirecting them); and because Bun 1.1.6's `process.kill()`
+rejects a negative pid outright instead of performing a real process-group
+signal, group termination falls back to shelling out to the `kill(1)`
+binary, which is unaffected by that validation.
 
 **Supported guarantee:** ordinary parent/child/grandchild descendants,
-including a process that ignores SIGTERM, are terminated within the
-configured deadline plus grace/cleanup allowance. **Not claimed:** containment
-of a deliberately detached daemon (e.g. a double-forked process that leaves
-the group via `setsid`) — that requires an outer sandbox/supervisor boundary,
-which this harness does not provide. Windows has no process-group kill
-primitive here and falls back to signalling only the direct child; this is a
-documented platform limitation, not process-tree cancellation.
+including a process that ignores SIGTERM or one with redirected stdio that
+outlives the shell that spawned it, are terminated within the configured
+deadline plus grace/cleanup allowance — independent of whether the direct
+child's own exit or stdio settles first. **Not claimed:** containment of a
+deliberately detached daemon (e.g. a double-forked process that leaves the
+group via `setsid`) — that requires an outer sandbox/supervisor boundary,
+which this harness does not provide; such a descendant is bounded only by
+the drain timeout, not actually terminated. Windows has no process-group
+kill primitive here and falls back to signalling only the direct child; this
+is a documented platform limitation, not process-tree cancellation.
 
 ## Output artifacts and recovery
 
@@ -146,8 +173,19 @@ value) and completeness markers, and pass through the same bounded
 presentation and sanitize path as any other tool result — including hostile
 content in a late recovery page. Unknown ID, unknown stream, evicted artifact,
 capture truncation, and empty source are distinct outcomes — never a bare "no
-output". `search_output`'s `startLine` resumes a prior truncated scan from
-where it left off (via the `scannedTo` receipt) without re-scanning or gaps.
+output". Both tools guarantee forward progress: `read_output` bounds a page
+to whole lines unless even the first requested line doesn't fit, in which
+case it falls back to UTF-8-byte-range pagination of that one line (never
+splitting a multi-byte character, including a complete one that happens to
+sit at the exact end of the page window); `search_output`'s `startLine`
+resumes a prior page — using its own delivered receipt, never a
+caller-assumed formula like "scanned-to plus one", which would skip matches
+already found within the scanned region but withheld by `limit` — and bounds
+its own delivered match list to the same review budget as everything else,
+with an explicit "page bounded" note distinct from "scan bounded by size"
+(the internal 1,000,000-character scan cap, reported via a `scannedLines`
+count that reflects what was actually scanned, not the full requested
+range).
 
 ## Focus rollout
 
