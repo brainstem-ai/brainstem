@@ -4,7 +4,13 @@ import { buildActiveContext } from "../src/capabilities/context";
 import { BASELINE_TOOL_IDS, CapabilityRegistry } from "../src/capabilities/registry";
 
 function dummyTool(name: string): AgentTool {
-  return { name, label: name, description: "dummy", parameters: { type: "object", properties: {} }, execute: async () => ({ content: [], details: {} }) };
+  return {
+    name,
+    label: name,
+    description: "dummy",
+    parameters: { type: "object", properties: {} },
+    execute: async () => ({ content: [], details: {} }),
+  };
 }
 
 describe("buildActiveContext", () => {

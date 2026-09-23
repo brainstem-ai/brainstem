@@ -5,9 +5,7 @@ describe("gateQuestions", () => {
   test("builds the battery without writes_outside_project (containment resolved in code)", () => {
     const q = gateQuestions("fix the failing auth test");
     const ids = Object.keys(q).sort();
-    expect(ids).toEqual(
-      ["destructive", "disposition", "exfiltrates", "on_task", "touches_credentials"].sort(),
-    );
+    expect(ids).toEqual(["destructive", "disposition", "exfiltrates", "on_task", "touches_credentials"].sort());
   });
 
   test("every question is typed and names its target with backticks", () => {
@@ -39,14 +37,7 @@ describe("sanitizeQuestions", () => {
 describe("verifyQuestions", () => {
   test("adds evidence_of_success and operational_failure as new disjoint ids", () => {
     const q = verifyQuestions();
-    expect(Object.keys(q).sort()).toEqual(
-      [
-        "evidence_of_success",
-        "operational_failure",
-        "result_quality",
-        "satisfies_intent",
-      ].sort(),
-    );
+    expect(Object.keys(q).sort()).toEqual(["evidence_of_success", "operational_failure", "result_quality", "satisfies_intent"].sort());
     expect(q.evidence_of_success?.type).toBe("noul");
     expect(q.operational_failure?.type).toBe("noul");
     expect(q.operational_failure?.instructions).toContain("TOOL ITSELF");

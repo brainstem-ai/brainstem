@@ -69,38 +69,38 @@ export function policyForTrust(trust: number): Policy {
       exfilNoul: 0.5,
       offTaskOnTask: 0.3,
     },
-  sanitize: {
-    review: 0.35,
-    action: 0.7,
-    severityBlock: 2.0,
-  },
-  pulse: {
-    repeatNoul: 0.7,
-    stuckNoul: 0.7,
-    progressNoul: 0.3,
-    stopScore: 0.5,
-  },
-  steer: {
-    miniConfidence: 0.6,
-  },
-  select: {
-    addNoul: 0.65,
-    retainNoul: 0.45,
-  },
-  // Experimental pilot defaults for structural-output focus. Not production-calibrated.
-  focus: {
-    relevanceNoul: 0.6,
-    minChars: 800,
-  },
-  jev: {
-    deadlineMs: 1500,
-    retries: 0,
-    breaker: {
-      threshold: 3,
-      cooldownMs: 10000,
-      probe: 1,
+    sanitize: {
+      review: 0.35,
+      action: 0.7,
+      severityBlock: 2.0,
     },
-  },
-  budgets: {},
-};
+    pulse: {
+      repeatNoul: 0.7,
+      stuckNoul: 0.7,
+      progressNoul: 0.3,
+      stopScore: 0.5,
+    },
+    steer: {
+      miniConfidence: 0.6,
+    },
+    select: {
+      addNoul: 0.65,
+      retainNoul: 0.45,
+    },
+    // Experimental pilot defaults for structural-output focus. Not production-calibrated.
+    focus: {
+      relevanceNoul: 0.6,
+      minChars: 800,
+    },
+    jev: {
+      deadlineMs: 1500,
+      retries: 0,
+      breaker: {
+        threshold: 3,
+        cooldownMs: 10000,
+        probe: 1,
+      },
+    },
+    budgets: {},
+  };
 }

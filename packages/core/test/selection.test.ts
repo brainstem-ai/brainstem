@@ -102,7 +102,7 @@ describe("decideSelect", () => {
 
   test("scores above add threshold are recommended with reason added", () => {
     const { catalog, candidates, current } = setup(["tool:a"]);
-    const answers = { "select__tool_a": noulAnswer(0.8) };
+    const answers = { select__tool_a: noulAnswer(0.8) };
     const { recommended, scores, reasons } = decideSelect(catalog, candidates, answers, current, POLICY);
     expect(getBit(recommended, 0)).toBe(true);
     expect(scores["tool:a"]).toBe(0.8);
@@ -111,7 +111,7 @@ describe("decideSelect", () => {
 
   test("mid-range score for an inactive candidate is excluded", () => {
     const { catalog, candidates, current } = setup(["tool:a"]);
-    const answers = { "select__tool_a": noulAnswer(0.5) };
+    const answers = { select__tool_a: noulAnswer(0.5) };
     const { recommended, reasons } = decideSelect(catalog, candidates, answers, current, POLICY);
     expect(getBit(recommended, 0)).toBe(false);
     expect(reasons["tool:a"]).toEqual({ kind: "excluded", score: 0.5 });
@@ -120,7 +120,7 @@ describe("decideSelect", () => {
   test("mid-range score for a currently active candidate is retained", () => {
     const { catalog, candidates, current } = setup(["tool:a"]);
     setBit(current, 0);
-    const answers = { "select__tool_a": noulAnswer(0.5) };
+    const answers = { select__tool_a: noulAnswer(0.5) };
     const { recommended, reasons } = decideSelect(catalog, candidates, answers, current, POLICY);
     expect(getBit(recommended, 0)).toBe(true);
     expect(reasons["tool:a"]).toEqual({ kind: "retained", score: 0.5 });
@@ -128,7 +128,7 @@ describe("decideSelect", () => {
 
   test("missing answer is marked unevaluated and not scored", () => {
     const { catalog, candidates, current } = setup(["tool:a", "tool:b"]);
-    const answers = { "select__tool_a": noulAnswer(0.8) };
+    const answers = { select__tool_a: noulAnswer(0.8) };
     const { scores, reasons } = decideSelect(catalog, candidates, answers, current, POLICY);
     expect(scores["tool:b"]).toBeUndefined();
     expect(reasons["tool:b"]).toEqual({ kind: "unevaluated" });
@@ -136,7 +136,7 @@ describe("decideSelect", () => {
 
   test("evaluated bitmap includes only candidates that received answers", () => {
     const { catalog, candidates } = setup(["tool:a", "tool:b"]);
-    const answers = { "select__tool_a": noulAnswer(0.8) };
+    const answers = { select__tool_a: noulAnswer(0.8) };
     const evaluated = buildEvaluatedBitmap(catalog, candidates, answers);
     expect(getBit(evaluated, 0)).toBe(true);
     expect(getBit(evaluated, 1)).toBe(false);
@@ -163,7 +163,7 @@ describe("decideSelect", () => {
     const available = bitmapFor(catalog, ["tool:a", "skill:b"]);
     const baseline = bitmapFor(catalog, ["tool:a"]);
     const candidates = eligibleForSelection(catalog, available, baseline, createBitmap(catalog.catalogHash, 3));
-    const answers = { "select__skill_b": noulAnswer(0.9) };
+    const answers = { select__skill_b: noulAnswer(0.9) };
     const { recommended } = decideSelect(catalog, candidates, answers, createBitmap(catalog.catalogHash, 3), POLICY);
     expect(toIds(recommended, catalog.entries)).toEqual(["skill:b"]);
     const { active, dropped } = computeActive(catalog, {

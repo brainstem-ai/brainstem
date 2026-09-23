@@ -76,9 +76,7 @@ describe("engine fallbacks on unavailable judgment", () => {
     const decisions = decisionEvents(journalPath);
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.t === "decision" && decisions[0]?.action).toBe("ask");
-    expect(decisions[0]?.t === "decision" && decisions[0]?.judgmentId).toBe(
-      reflex?.t === "reflex" ? reflex.judgmentId : undefined,
-    );
+    expect(decisions[0]?.t === "decision" && decisions[0]?.judgmentId).toBe(reflex?.t === "reflex" ? reflex.judgmentId : undefined);
   });
 
   test("gate with an ask floor falls back to the static verdict", async () => {
@@ -115,7 +113,13 @@ describe("engine fallbacks on unavailable judgment", () => {
 
   test("verify marks the result unverified with unavailable status when judgment fails", async () => {
     const { engine, journalPath } = engineWith(mockSystemOne.failing("provider down"));
-    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "content" });
+    const observed = await engine.observeToolResult({
+      task: "t",
+      source: "tool:read x",
+      actionSummary: "read x",
+      intent: "intent",
+      content: "content",
+    });
 
     expect(observed.verify.action).toBe("ok");
     expect(observed.verify.verified).toBe(false);
@@ -129,7 +133,13 @@ describe("engine fallbacks on unavailable judgment", () => {
     const { satisfies_intent: _s, result_quality: _q, ...sanitizeOnly } = sanitizeAnswers();
     const provider = mockSystemOne(() => sanitizeOnly);
     const { engine, journalPath } = engineWith(provider);
-    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "clean content" });
+    const observed = await engine.observeToolResult({
+      task: "t",
+      source: "tool:read x",
+      actionSummary: "read x",
+      intent: "intent",
+      content: "clean content",
+    });
 
     expect(observed.sanitize.action).toBe("pass");
     expect(observed.verify.verified).toBe(false);
@@ -147,7 +157,13 @@ describe("engine fallbacks on unavailable judgment", () => {
       contains_agent_directive: { type: "bogus" } as unknown as Answer,
     }));
     const { engine } = engineWith(provider);
-    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "content" });
+    const observed = await engine.observeToolResult({
+      task: "t",
+      source: "tool:read x",
+      actionSummary: "read x",
+      intent: "intent",
+      content: "content",
+    });
 
     expect(observed.sanitize.action).toBe("block");
     expect(observed.sanitize.reasons[0]).toBe("sanitizer unavailable — content withheld");
@@ -188,7 +204,13 @@ describe("engine fallbacks on unavailable judgment", () => {
 
   test("completed judgments still verify positively", async () => {
     const { engine } = engineWith(mockSystemOne(() => sanitizeAnswers()));
-    const observed = await engine.observeToolResult({ task: "t", source: "tool:read x", actionSummary: "read x", intent: "intent", content: "clean" });
+    const observed = await engine.observeToolResult({
+      task: "t",
+      source: "tool:read x",
+      actionSummary: "read x",
+      intent: "intent",
+      content: "clean",
+    });
     expect(observed.verify.verified).toBe(true);
     expect(observed.result).not.toBeNull();
   });
@@ -204,9 +226,7 @@ describe("engine deterministic budgets", () => {
       ok: false,
       breached: ["maxElapsedMs"],
     });
-    expect(
-      checkBudgets({ modelCalls: 0, elapsedMs: 0, knownSpendUsd: "unknown" }, { maxSpendUsd: 0.01 }),
-    ).toEqual({ ok: true });
+    expect(checkBudgets({ modelCalls: 0, elapsedMs: 0, knownSpendUsd: "unknown" }, { maxSpendUsd: 0.01 })).toEqual({ ok: true });
     expect(checkBudgets({ modelCalls: 0, elapsedMs: 0, knownSpendUsd: 0.02 }, { maxSpendUsd: 0.01 })).toEqual({
       ok: false,
       breached: ["maxSpendUsd"],

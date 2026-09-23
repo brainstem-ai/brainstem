@@ -62,7 +62,15 @@ async function main(): Promise<void> {
 
   console.log("=== Shipped Focus vs RTK, on the pilot's own real captures ===\n");
 
-  const rows: { id: string; capture: string; mode: string; rawChars: number; rtkChars: number; focusChars: number; grounded: boolean | "n/a (negative control)" }[] = [];
+  const rows: {
+    id: string;
+    capture: string;
+    mode: string;
+    rawChars: number;
+    rtkChars: number;
+    focusChars: number;
+    grounded: boolean | "n/a (negative control)";
+  }[] = [];
 
   for (const c of cases) {
     const content = loadCapture(c.capture);
@@ -106,7 +114,9 @@ async function main(): Promise<void> {
   console.log(`Total chars across all ${rows.length} cases:`);
   console.log(`  raw:   ${totalRaw}`);
   console.log(`  rtk:   ${totalRtk} (${((1 - totalRtk / totalRaw) * 100).toFixed(1)}% reduction vs raw)`);
-  console.log(`  focus: ${totalFocus} (${((1 - totalFocus / totalRaw) * 100).toFixed(1)}% reduction vs raw, ${((1 - totalFocus / totalRtk) * 100).toFixed(1)}% smaller than RTK)`);
+  console.log(
+    `  focus: ${totalFocus} (${((1 - totalFocus / totalRaw) * 100).toFixed(1)}% reduction vs raw, ${((1 - totalFocus / totalRtk) * 100).toFixed(1)}% smaller than RTK)`,
+  );
   console.log(`\nGrounding: ${groundedCount}/${groundableCount} cases kept all required evidence (${missingCount} missing)`);
   console.log("\nThis reuses the pilot's exact real captures/tasks/RTK sizes but runs the");
   console.log("actual shipped engine.focus()/presentArtifact() code, not the standalone");

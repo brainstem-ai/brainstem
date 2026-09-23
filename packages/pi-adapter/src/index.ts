@@ -141,7 +141,9 @@ export function attachReflexes(agent: Agent, reflexes: Reflexes, options: Attach
     // the raw text, if Focus is off): Sanitize/Verify below see exactly
     // what can ever be delivered — never a shorter pre-Focus slice, and
     // never a longer post-Sanitize expansion.
-    const bounded: BoundedTextLike = candidate.trim() ? boundForReview(candidate, REVIEW_CHAR_CAP) : { text: "", truncated: false, shownChars: 0, totalChars: 0 };
+    const bounded: BoundedTextLike = candidate.trim()
+      ? boundForReview(candidate, REVIEW_CHAR_CAP)
+      : { text: "", truncated: false, shownChars: 0, totalChars: 0 };
 
     let finalText = bounded.text;
     if (candidate.trim()) {

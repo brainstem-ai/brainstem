@@ -84,16 +84,23 @@ describe("SelectDriver.refresh", () => {
 describe("CapabilityRegistry.workingSet selected masks", () => {
   test("uses passed evaluated and recommended masks", () => {
     const registry = new CapabilityRegistry();
-    registry.register(
-      { id: "skill:opt", kind: "skill", version: "1.0.0", description: "optional skill", alwaysAvailable: true },
-      null,
-    );
+    registry.register({ id: "skill:opt", kind: "skill", version: "1.0.0", description: "optional skill", alwaysAvailable: true }, null);
     const catalog = registry.snapshot();
     const evaluated = fromIds(["skill:opt"], catalog.entries, catalog.catalogHash);
     const recommended = fromIds(["skill:opt"], catalog.entries, catalog.catalogHash);
     const ws = registry.workingSet({}, { evaluated, recommended });
-    expect(getBit(ws.recommended, catalog.entries.findIndex((d) => d.id === "skill:opt"))).toBe(true);
-    expect(getBit(ws.evaluated, catalog.entries.findIndex((d) => d.id === "skill:opt"))).toBe(true);
+    expect(
+      getBit(
+        ws.recommended,
+        catalog.entries.findIndex((d) => d.id === "skill:opt"),
+      ),
+    ).toBe(true);
+    expect(
+      getBit(
+        ws.evaluated,
+        catalog.entries.findIndex((d) => d.id === "skill:opt"),
+      ),
+    ).toBe(true);
   });
 
   test("zero-arg workingSet is unchanged", () => {

@@ -20,7 +20,8 @@ describe("genericJudge — parsing", () => {
 
   test("extracts JSON wrapped in a code fence or surrounding prose", async () => {
     const judge = genericJudge({
-      complete: async () => 'Sure, here is my answer:\n```json\n{"is_safe": 0.1, "destructiveness": 2, "disposition": "deny"}\n```\nHope that helps!',
+      complete: async () =>
+        'Sure, here is my answer:\n```json\n{"is_safe": 0.1, "destructiveness": 2, "disposition": "deny"}\n```\nHope that helps!',
     });
     const result = await judge.ask({ task: "x" }, QUESTIONS);
     expect(result.answers.is_safe).toEqual({ type: "noul", noul: 0.1 });

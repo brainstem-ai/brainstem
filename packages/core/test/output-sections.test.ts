@@ -3,15 +3,7 @@ import { dependencyClosure, splitIntoSections } from "../src/output-sections";
 
 describe("splitIntoSections", () => {
   test("blank-line-delimited text splits into sections in source order with verbatim text", () => {
-    const content = [
-      "First paragraph",
-      "still first",
-      "",
-      "  Second paragraph",
-      "  indented",
-      "",
-      "Third paragraph",
-    ].join("\n");
+    const content = ["First paragraph", "still first", "", "  Second paragraph", "  indented", "", "Third paragraph"].join("\n");
 
     const manifest = splitIntoSections("run:1", content);
     expect(manifest.entries).toHaveLength(3);
@@ -67,16 +59,7 @@ describe("splitIntoSections", () => {
 
 describe("dependencyClosure", () => {
   test("returns manifest-order ids including selected and transitive dependencies", () => {
-    const manifest = splitIntoSections(
-      "deps",
-      [
-        "Header:",
-        "  child one",
-        "    grandchild",
-        "",
-        "orphan paragraph",
-      ].join("\n"),
-    );
+    const manifest = splitIntoSections("deps", ["Header:", "  child one", "    grandchild", "", "orphan paragraph"].join("\n"));
     const selected = [manifest.entries[1]!.id];
     const closure = dependencyClosure(manifest, selected);
     expect(closure).toContain(selected[0]);

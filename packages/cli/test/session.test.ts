@@ -123,10 +123,7 @@ describe("SessionRecorder", () => {
       truncated: false,
     });
 
-    expect(recorder.recentActivity(2)).toEqual([
-      "write: src/auth.ts (ok, 0.0s)",
-      "bash: rm -rf / (blocked)",
-    ]);
+    expect(recorder.recentActivity(2)).toEqual(["write: src/auth.ts (ok, 0.0s)", "bash: rm -rf / (blocked)"]);
     expect(recorder.recentActivity(5)[0]).toBe("bash: npm test (exit 1, 2.1s)");
   });
 
@@ -161,14 +158,7 @@ describe("SessionRecorder", () => {
     recorder.endSession("normal");
 
     const events = loadJournal(journalPath);
-    expect(events.map((e) => e.t)).toEqual([
-      "session_start",
-      "task_start",
-      "turn_start",
-      "turn_end",
-      "task_update",
-      "session_end",
-    ]);
+    expect(events.map((e) => e.t)).toEqual(["session_start", "task_start", "turn_start", "turn_end", "task_update", "session_end"]);
     const taskStart = events.find((e): e is Extract<JournalEvent, { t: "task_start" }> => e.t === "task_start");
     expect(taskStart?.taskId).toBe(task.id);
     expect(taskStart?.sessionId).toBe(recorder.sessionId);

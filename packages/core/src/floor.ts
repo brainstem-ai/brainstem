@@ -22,18 +22,9 @@ const DENY_COMMANDS: RegExp[] = [
   /(hard\s+reset|diskutil\s+erase)/,
 ];
 
-const ASK_COMMANDS: RegExp[] = [
-  /git\s+push\s+.*--force\b|--force\b.*git\s+push/,
-  /\bnpm\s+publish\b/,
-  /docker\s+system\s+prune/,
-];
+const ASK_COMMANDS: RegExp[] = [/git\s+push\s+.*--force\b|--force\b.*git\s+push/, /\bnpm\s+publish\b/, /docker\s+system\s+prune/];
 
-const DENY_WRITE_PATHS: RegExp[] = [
-  /^~\/\.ssh\//,
-  /(^|\/)\.env(\.|$)/,
-  /(^|\/)\.aws\//,
-  /id_rsa|id_ed25519|authorized_keys|\.ssh\//,
-];
+const DENY_WRITE_PATHS: RegExp[] = [/^~\/\.ssh\//, /(^|\/)\.env(\.|$)/, /(^|\/)\.aws\//, /id_rsa|id_ed25519|authorized_keys|\.ssh\//];
 
 const DENY_WRITE_OUTSIDE_ROOT: RegExp[] = [
   // /etc, /var, and /tmp are symlinks to /private/{etc,var,tmp} on macOS —
@@ -43,12 +34,7 @@ const DENY_WRITE_OUTSIDE_ROOT: RegExp[] = [
   /^(\/etc|\/var|\/usr|\/System|\/Library|\/private\/etc|\/private\/var|\/private\/tmp)\//,
 ];
 
-const ASK_READ_PATHS: RegExp[] = [
-  /(^|\/)\.env(\.|$)/,
-  /(~|\/)\.aws\//,
-  /\.ssh\//,
-  /id_rsa|id_ed25519/,
-];
+const ASK_READ_PATHS: RegExp[] = [/(^|\/)\.env(\.|$)/, /(~|\/)\.aws\//, /\.ssh\//, /id_rsa|id_ed25519/];
 
 export function staticVerdict(tool: string, action: StaticAction, root: string): StaticVerdict {
   // Command-pattern checks are NOT an OS sandbox — they are a heuristic first line of defense.

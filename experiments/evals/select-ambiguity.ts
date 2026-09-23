@@ -65,7 +65,15 @@ function freshRegistry(): CapabilityRegistry {
   const registry = new CapabilityRegistry();
   for (const c of CANDIDATES) {
     registry.register(
-      { id: `tool:${c.name}`, kind: "tool", version: "1.0.0", description: c.description, useWhen: c.useWhen, avoidWhen: c.avoidWhen, alwaysAvailable: false },
+      {
+        id: `tool:${c.name}`,
+        kind: "tool",
+        version: "1.0.0",
+        description: c.description,
+        useWhen: c.useWhen,
+        avoidWhen: c.avoidWhen,
+        alwaysAvailable: false,
+      },
       makeStubTool(c.name),
     );
   }
@@ -91,7 +99,12 @@ async function main(): Promise<void> {
   for (let i = 0; i < RUNS; i++) {
     const called = await runRawAgentOnce(model, streamFn);
     rawRuns.push(called);
-    const verdict = called.length === 0 ? "no tool call" : called.includes(CORRECT_TOOL) ? `CORRECT (called: ${called.join(", ")})` : `WRONG (called: ${called.join(", ")})`;
+    const verdict =
+      called.length === 0
+        ? "no tool call"
+        : called.includes(CORRECT_TOOL)
+          ? `CORRECT (called: ${called.join(", ")})`
+          : `WRONG (called: ${called.join(", ")})`;
     console.log(`   run ${i + 1}: ${verdict}`);
   }
   const rawCorrect = rawRuns.filter((c) => c.includes(CORRECT_TOOL)).length;
@@ -109,7 +122,9 @@ async function main(): Promise<void> {
     const decision = await driver.refresh({ task: TASK, recent: [] }, { reason: "initial" });
     const catalog = registry.snapshot();
     const ws = registry.workingSet({}, { evaluated: decision.evaluated, recommended: decision.recommended });
-    const activeOptional = toIds(ws.active, catalog.entries).filter((id) => !BASELINE_TOOL_IDS.includes(id as never)).map((id) => id.replace(/^tool:/, ""));
+    const activeOptional = toIds(ws.active, catalog.entries)
+      .filter((id) => !BASELINE_TOOL_IDS.includes(id as never))
+      .map((id) => id.replace(/^tool:/, ""));
     selectRuns.push({ included: activeOptional, scores: decision.scores });
     const correctScore = decision.scores[`tool:${CORRECT_TOOL}`] ?? decision.scores[CORRECT_TOOL];
     const emailScore = decision.scores["tool:send_email"] ?? decision.scores.send_email;
@@ -144,7 +159,9 @@ async function main(): Promise<void> {
     }
     const called = toolNamesCalled(harness.agent);
     harnessedRuns.push(called);
-    console.log(`   run ${i + 1}: ${called.includes(CORRECT_TOOL) ? "CORRECT" : called.length === 0 ? "no tool call" : `called: ${called.join(", ")}`}`);
+    console.log(
+      `   run ${i + 1}: ${called.includes(CORRECT_TOOL) ? "CORRECT" : called.length === 0 ? "no tool call" : `called: ${called.join(", ")}`}`,
+    );
     rmSync(hcwd, { recursive: true, force: true });
   }
   const harnessedCorrect = harnessedRuns.filter((c) => c.includes(CORRECT_TOOL)).length;
@@ -152,7 +169,9 @@ async function main(): Promise<void> {
 
   console.log("\n=== Summary ===");
   console.log(`Raw agent:       ${rawCorrect}/${RUNS} correct, ${rawFellForDistractor}/${RUNS} fell for the email distractor`);
-  console.log(`Select alone:    ${selectCorrect}/${RUNS} correct (kept only send_slack_message), ${selectFellForDistractor}/${RUNS} included send_email`);
+  console.log(
+    `Select alone:    ${selectCorrect}/${RUNS} correct (kept only send_slack_message), ${selectFellForDistractor}/${RUNS} included send_email`,
+  );
   console.log(`Harnessed agent: ${harnessedCorrect}/${RUNS} correct, ${harnessedFellForDistractor}/${RUNS} fell for the email distractor`);
   console.log(`\n${RUNS} runs each — small sample, real variance expected. This tests one`);
   console.log("ambiguous task/registry shape, not ambiguity handling in general.");

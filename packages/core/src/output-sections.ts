@@ -161,7 +161,9 @@ export function splitIntoSections(artifactId: string, content: string): SectionM
   }
 
   const hasBlankLines = /\n\s*\n/.test(content);
-  const blocks = hasBlankLines ? byteOffsetsForBlocks(content) : [{ text: content, startByte: 0, endByte: Buffer.byteLength(content, "utf8") }];
+  const blocks = hasBlankLines
+    ? byteOffsetsForBlocks(content)
+    : [{ text: content, startByte: 0, endByte: Buffer.byteLength(content, "utf8") }];
   const sections = processBlocks(blocks, artifactId);
 
   const denseFallback = !hasBlankLines && sections.length === 1 && sections[0]!.text === content;

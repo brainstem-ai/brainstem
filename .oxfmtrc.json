@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["experiments/output-focus/results/**", "packages/**/fixtures/**"],
+  "printWidth": 140,
+  "semi": true,
+  "singleQuote": false,
+  "sortImports": false,
+  "sortPackageJson": false,
+  "trailingComma": "all"
+}

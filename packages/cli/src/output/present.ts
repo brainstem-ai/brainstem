@@ -97,7 +97,9 @@ export function presentFocused(
 
   const pieces: string[] = [];
   if (omitted) {
-    pieces.push(`showing ${selectedSections.length} of ${manifest.entries.length} sections (${selectedChars} of ${totalChars} chars) relevant to the task`);
+    pieces.push(
+      `showing ${selectedSections.length} of ${manifest.entries.length} sections (${selectedChars} of ${totalChars} chars) relevant to the task`,
+    );
   }
   if (bounded.truncated) {
     pieces.push(`the selected sections themselves were bounded to ${bounded.shownChars} of ${text.length} characters`);

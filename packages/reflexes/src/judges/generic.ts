@@ -15,7 +15,9 @@ function describeQuestion(id: string, q: Question): string {
     const levels = q.criteria.map((c, i) => `${i}=${c}`).join("; ");
     return `- "${id}" (score, 0 to ${q.criteria.length - 1}): ${q.instructions}\n  Levels: ${levels}`;
   }
-  const choices = Object.entries(q.criteria).map(([k, v]) => `"${k}"=${v}`).join("; ");
+  const choices = Object.entries(q.criteria)
+    .map(([k, v]) => `"${k}"=${v}`)
+    .join("; ");
   return `- "${id}" (choice): ${q.instructions}\n  Options: ${choices}`;
 }
 
@@ -82,7 +84,9 @@ export function genericJudge(options: GenericJudgeOptions): SystemOne {
       try {
         raw = extractJson(text);
       } catch (error) {
-        throw new JevUnavailableError(`genericJudge: could not parse a JSON response (${error instanceof Error ? error.message : String(error)})`);
+        throw new JevUnavailableError(
+          `genericJudge: could not parse a JSON response (${error instanceof Error ? error.message : String(error)})`,
+        );
       }
 
       const answers: Record<string, Answer> = {};

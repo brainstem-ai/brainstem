@@ -2,7 +2,9 @@
   "name": "@brainstem/pi-adapter",
   "version": "0.1.0",
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "prepack": "../../node_modules/.bin/tsdown --config ../../tsdown.config.ts --filter pi-adapter"
   },

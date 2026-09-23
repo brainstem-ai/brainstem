@@ -81,10 +81,7 @@ describe("decideGate (pure)", () => {
   });
 
   test("noul alone denies credential exposure", () => {
-    const d = decideGate(
-      { ...base, touches_credentials: noulAnswer(0.94), disposition: choiceAnswer("auto_run", 0.99) },
-      POLICY,
-    );
+    const d = decideGate({ ...base, touches_credentials: noulAnswer(0.94), disposition: choiceAnswer("auto_run", 0.99) }, POLICY);
     expect(d.action).toBe("deny");
   });
 
@@ -99,19 +96,13 @@ describe("decideGate (pure)", () => {
   });
 
   test("moderate destructive score escalates auto to ask", () => {
-    const d = decideGate(
-      { ...base, destructive: scoreAnswer(0.8, 0.9), disposition: choiceAnswer("auto_run", 0.99) },
-      POLICY,
-    );
+    const d = decideGate({ ...base, destructive: scoreAnswer(0.8, 0.9), disposition: choiceAnswer("auto_run", 0.99) }, POLICY);
     expect(d.action).toBe("ask");
     expect(d.reasons.some((r) => r.includes("destructive"))).toBe(true);
   });
 
   test("high-confidence deny denies", () => {
-    const d = decideGate(
-      { ...base, destructive: scoreAnswer(0.9, 0.8), disposition: choiceAnswer("deny", 0.9) },
-      POLICY,
-    );
+    const d = decideGate({ ...base, destructive: scoreAnswer(0.9, 0.8), disposition: choiceAnswer("deny", 0.9) }, POLICY);
     expect(d.action).toBe("deny");
   });
 
@@ -153,26 +144,17 @@ describe("decideSanitize (pure)", () => {
   });
 
   test("reviews moderate danger below action threshold", () => {
-    const d = decideSanitize(
-      sanitizeScript({ requests_dangerous_action: noulAnswer(0.67), severity: scoreAnswer(0.9, 0.8) })(),
-      POLICY,
-    );
+    const d = decideSanitize(sanitizeScript({ requests_dangerous_action: noulAnswer(0.67), severity: scoreAnswer(0.9, 0.8) })(), POLICY);
     expect(d.action).toBe("review");
   });
 
   test("severity alone escalates review to block", () => {
-    const d = decideSanitize(
-      sanitizeScript({ severity: scoreAnswer(2.4, 0.9) })(),
-      POLICY,
-    );
+    const d = decideSanitize(sanitizeScript({ severity: scoreAnswer(2.4, 0.9) })(), POLICY);
     expect(d.action).toBe("block");
   });
 
   test("ignores noul answers outside the hazard battery", () => {
-    const d = decideSanitize(
-      sanitizeScript({ on_task: noulAnswer(0.95) })(),
-      POLICY,
-    );
+    const d = decideSanitize(sanitizeScript({ on_task: noulAnswer(0.95) })(), POLICY);
     expect(d.action).toBe("pass");
   });
 });
@@ -225,9 +207,9 @@ describe("ReflexEngine", () => {
     const events = loadJournal(journalPath);
     const reflex = events[0];
     const recorded = events[1];
-    expect(
-      reflex?.t === "reflex" && recorded?.t === "decision" ? recorded.judgmentId : undefined,
-    ).toBe(reflex?.t === "reflex" ? reflex.judgmentId : undefined);
+    expect(reflex?.t === "reflex" && recorded?.t === "decision" ? recorded.judgmentId : undefined).toBe(
+      reflex?.t === "reflex" ? reflex.judgmentId : undefined,
+    );
     expect(recorded?.t === "decision" && recorded.staticVerdict).toBe("ask");
   });
 
@@ -250,7 +232,9 @@ describe("ReflexEngine", () => {
     expect(reflex?.t === "reflex" && reflex.status).toBe("completed");
     const decisions = events.filter((e) => e.t === "decision");
     expect(decisions).toHaveLength(2);
-    expect(decisions.every((d) => d.t === "decision" && d.judgmentId === (reflex?.t === "reflex" ? reflex.judgmentId : undefined))).toBe(true);
+    expect(decisions.every((d) => d.t === "decision" && d.judgmentId === (reflex?.t === "reflex" ? reflex.judgmentId : undefined))).toBe(
+      true,
+    );
   });
 
   test("gate sends real action facts for writes: changeSummary in state, no placeholder command, no actionHash", async () => {
@@ -323,13 +307,7 @@ describe("ReflexEngine", () => {
       ...sanitizeScript({})(),
       ...verifyAnswers(),
     }));
-    const content = [
-      "# Setup",
-      "",
-      "Run `npm install` first.",
-      "Run npm test before committing.",
-      "",
-    ].join("\n");
+    const content = ["# Setup", "", "Run `npm install` first.", "Run npm test before committing.", ""].join("\n");
     const decision = await engine.sanitize(content, "tool:read README.md");
     expect(decision.action).toBe("pass");
     expect(decision.reasons).toHaveLength(0);
@@ -374,9 +352,7 @@ describe("ReflexEngine", () => {
     expect(new Set(reflexes.map((r) => (r.t === "reflex" ? r.judgmentId : ""))).size).toBe(2);
     for (const d of decisions) {
       expect(d.t === "decision" && d.judgmentId !== undefined).toBe(true);
-      expect(
-        d.t === "decision" && reflexes.some((r) => r.t === "reflex" && r.judgmentId === d.judgmentId),
-      ).toBe(true);
+      expect(d.t === "decision" && reflexes.some((r) => r.t === "reflex" && r.judgmentId === d.judgmentId)).toBe(true);
     }
   });
 
@@ -507,7 +483,9 @@ describe("ReflexEngine.select", () => {
     const decisions = events.filter((e) => e.t === "decision" && e.reflex === "select");
     expect(reflexes).toHaveLength(1);
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]?.t === "decision" && decisions[0].judgmentId).toBe(reflexes[0]?.t === "reflex" ? reflexes[0].judgmentId : undefined);
+    expect(decisions[0]?.t === "decision" && decisions[0].judgmentId).toBe(
+      reflexes[0]?.t === "reflex" ? reflexes[0].judgmentId : undefined,
+    );
   });
 
   test("zero eligible candidates makes no SystemOne call and journals no reflex", async () => {
@@ -560,7 +538,9 @@ function focusManifest(...paragraphs: string[]) {
   return splitIntoSections("focus-engine", paragraphs.join("\n\n"));
 }
 
-function focusEngineWith(script: (state: unknown, questions: Record<string, import("../src/types").Question>) => Record<string, import("../src/types").Answer>) {
+function focusEngineWith(
+  script: (state: unknown, questions: Record<string, import("../src/types").Question>) => Record<string, import("../src/types").Answer>,
+) {
   const mock = mockSystemOne(script);
   dir = mkdtempSync(join(tmpdir(), "brainstem-engine-focus-"));
   const journalPath = join(dir, "session.ndjson");
@@ -602,7 +582,9 @@ describe("ReflexEngine.focus", () => {
     const decisions = events.filter((e) => e.t === "decision" && e.reflex === "focus");
     expect(reflexes).toHaveLength(1);
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]?.t === "decision" && decisions[0].judgmentId).toBe(reflexes[0]?.t === "reflex" ? reflexes[0].judgmentId : undefined);
+    expect(decisions[0]?.t === "decision" && decisions[0].judgmentId).toBe(
+      reflexes[0]?.t === "reflex" ? reflexes[0].judgmentId : undefined,
+    );
   });
 
   test("exhaustive bypass makes zero SystemOne calls and journals no reflex", async () => {
@@ -629,7 +611,11 @@ describe("ReflexEngine.focus", () => {
 });
 
 describe("ReflexEngine answer cache", () => {
-  function deferredSystemOne(name = "mock:deferred"): { systemOne: SystemOne; release: (answers: Record<string, Answer>) => void; callCount: () => number } {
+  function deferredSystemOne(name = "mock:deferred"): {
+    systemOne: SystemOne;
+    release: (answers: Record<string, Answer>) => void;
+    callCount: () => number;
+  } {
     let calls = 0;
     const resolvers: ((answers: Record<string, Answer>) => void)[] = [];
     const systemOne: SystemOne = {

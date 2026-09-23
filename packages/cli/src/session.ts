@@ -165,7 +165,11 @@ export class SessionRecorder {
       // A failure fingerprint is exit status plus the first non-empty output line:
       // the same command failing the same way twice is the signal Pulse needs, and
       // the trailing noise that differs between runs must not split the group.
-      const firstLine = observation.excerpt.split("\n").find((line) => line.trim() !== "")?.slice(0, 200) ?? "";
+      const firstLine =
+        observation.excerpt
+          .split("\n")
+          .find((line) => line.trim() !== "")
+          ?.slice(0, 200) ?? "";
       const fingerprint = hashAction({
         status: observation.status,
         exitCode: observation.exitCode ?? null,

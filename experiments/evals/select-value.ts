@@ -75,7 +75,15 @@ async function main(): Promise<void> {
   const registry = new CapabilityRegistry();
   for (const c of CANDIDATES) {
     registry.register(
-      { id: c.id, kind: "tool", version: "1.0.0", description: c.description, useWhen: c.useWhen, avoidWhen: c.avoidWhen, alwaysAvailable: false },
+      {
+        id: c.id,
+        kind: "tool",
+        version: "1.0.0",
+        description: c.description,
+        useWhen: c.useWhen,
+        avoidWhen: c.avoidWhen,
+        alwaysAvailable: false,
+      },
       { name: c.id, execute: async () => ({ content: [] }) },
     );
   }
@@ -95,8 +103,12 @@ async function main(): Promise<void> {
   const baselineIds = [...BASELINE_TOOL_IDS];
 
   console.log("WITHOUT Select (naive: every registered tool is always exposed):");
-  console.log(`  tool count: ${allIds.length} (${baselineIds.length} baseline + ${CANDIDATES.length} optional, ALL shown regardless of relevance)`);
-  console.log(`  approx. schema bytes for the optional set: ${schemaBytesFor(catalog.entries.map((d) => d.id).filter((id) => !baselineIds.includes(id as never)))}`);
+  console.log(
+    `  tool count: ${allIds.length} (${baselineIds.length} baseline + ${CANDIDATES.length} optional, ALL shown regardless of relevance)`,
+  );
+  console.log(
+    `  approx. schema bytes for the optional set: ${schemaBytesFor(catalog.entries.map((d) => d.id).filter((id) => !baselineIds.includes(id as never)))}`,
+  );
   console.log("  the model must itself notice that 4 of these 5 tools are irrelevant, every single turn.\n");
 
   console.log("WITH Select (one real Jev judgment per optional tool, batched):");
@@ -111,15 +123,21 @@ async function main(): Promise<void> {
     const reason = decision.reasons[c.id];
     const score = decision.scores[c.id];
     const correct = included === c.relevant ? "correct" : "WRONG";
-    console.log(`  ${included ? "[included]" : "[excluded]"} ${c.id} — score=${score?.toFixed(2) ?? "n/a"} reason=${reason?.kind ?? "?"} (${correct}, expected ${c.relevant ? "included" : "excluded"})`);
+    console.log(
+      `  ${included ? "[included]" : "[excluded]"} ${c.id} — score=${score?.toFixed(2) ?? "n/a"} reason=${reason?.kind ?? "?"} (${correct}, expected ${c.relevant ? "included" : "excluded"})`,
+    );
   }
-  console.log(`  tool count actually exposed to the model: ${activeIds.length} (${baselineIds.length} baseline + ${activeOptional.length} optional)`);
+  console.log(
+    `  tool count actually exposed to the model: ${activeIds.length} (${baselineIds.length} baseline + ${activeOptional.length} optional)`,
+  );
   console.log(`  approx. schema bytes for the optional set: ${schemaBytesFor(activeOptional)}`);
 
   const allCorrect = CANDIDATES.every((c) => activeOptional.includes(c.id) === c.relevant);
   console.log(`\n=== Summary ===`);
   console.log(`Select correctly classified all ${CANDIDATES.length} candidates: ${allCorrect ? "YES" : "NO"}`);
-  console.log(`Optional-tool schema bytes: ${schemaBytesFor(allIds.filter((id) => !baselineIds.includes(id as never)))} (naive) -> ${schemaBytesFor(activeOptional)} (with Select)`);
+  console.log(
+    `Optional-tool schema bytes: ${schemaBytesFor(allIds.filter((id) => !baselineIds.includes(id as never)))} (naive) -> ${schemaBytesFor(activeOptional)} (with Select)`,
+  );
   console.log("\nThis is one scenario, one real judgment call — a real demonstration, not a");
   console.log("statistical claim. Re-run for more confidence; a larger real registry would");
   console.log("show a larger absolute reduction.");

@@ -71,14 +71,21 @@ async function main(): Promise<void> {
 
   console.log("=== Select vs self-selection: a large, ambiguous tool registry ===");
   console.log(`Task: "${TASK}"`);
-  console.log(`Registry: ${CANDIDATES.length} optional tools — 1 correct, 4 same-domain near-misses, ${CANDIDATES.length - 5} unrelated decoys.\n`);
+  console.log(
+    `Registry: ${CANDIDATES.length} optional tools — 1 correct, 4 same-domain near-misses, ${CANDIDATES.length - 5} unrelated decoys.\n`,
+  );
 
   console.log(`1) RAW AGENT, all ${CANDIDATES.length} tools always exposed (3 repeated runs):`);
   const rawRuns: string[][] = [];
   for (let i = 0; i < 3; i++) {
     const called = await runRawAgentOnce(model, streamFn);
     rawRuns.push(called);
-    const verdict = called.length === 0 ? "no tool call" : called.includes(CORRECT_TOOL) ? `CORRECT (called: ${called.join(", ")})` : `WRONG (called: ${called.join(", ")})`;
+    const verdict =
+      called.length === 0
+        ? "no tool call"
+        : called.includes(CORRECT_TOOL)
+          ? `CORRECT (called: ${called.join(", ")})`
+          : `WRONG (called: ${called.join(", ")})`;
     console.log(`   run ${i + 1}: ${verdict}`);
   }
   const rawCorrect = rawRuns.filter((c) => c.includes(CORRECT_TOOL)).length;
@@ -87,7 +94,15 @@ async function main(): Promise<void> {
   const registry = new CapabilityRegistry();
   for (const c of CANDIDATES) {
     registry.register(
-      { id: `tool:${c.name}`, kind: "tool", version: "1.0.0", description: c.description, useWhen: c.useWhen, avoidWhen: c.avoidWhen, alwaysAvailable: false },
+      {
+        id: `tool:${c.name}`,
+        kind: "tool",
+        version: "1.0.0",
+        description: c.description,
+        useWhen: c.useWhen,
+        avoidWhen: c.avoidWhen,
+        alwaysAvailable: false,
+      },
       makeStubTool(c.name),
     );
   }
@@ -119,7 +134,15 @@ async function main(): Promise<void> {
     const hRegistry = new CapabilityRegistry();
     for (const c of CANDIDATES) {
       hRegistry.register(
-        { id: `tool:${c.name}`, kind: "tool", version: "1.0.0", description: c.description, useWhen: c.useWhen, avoidWhen: c.avoidWhen, alwaysAvailable: false },
+        {
+          id: `tool:${c.name}`,
+          kind: "tool",
+          version: "1.0.0",
+          description: c.description,
+          useWhen: c.useWhen,
+          avoidWhen: c.avoidWhen,
+          alwaysAvailable: false,
+        },
         makeStubTool(c.name),
       );
     }
@@ -141,7 +164,9 @@ async function main(): Promise<void> {
     }
     const called = toolNamesCalled(harness.agent);
     harnessedRuns.push(called);
-    console.log(`   run ${i + 1}: ${called.includes(CORRECT_TOOL) ? "CORRECT" : called.length === 0 ? "no tool call" : `called: ${called.join(", ")}`}`);
+    console.log(
+      `   run ${i + 1}: ${called.includes(CORRECT_TOOL) ? "CORRECT" : called.length === 0 ? "no tool call" : `called: ${called.join(", ")}`}`,
+    );
     rmSync(hcwd, { recursive: true, force: true });
   }
   const harnessedCorrect = harnessedRuns.filter((c) => c.includes(CORRECT_TOOL)).length;

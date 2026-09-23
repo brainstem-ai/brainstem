@@ -9,14 +9,7 @@ import { JevCancelledError, JevUnavailableError } from "./errors";
 import { staticVerdict, type StaticVerdict } from "./floor";
 import type { Journal, ReflexStatus } from "./journal";
 import { policyForTrust, type Policy } from "./policy";
-import {
-  gateQuestions,
-  pulseQuestions,
-  sanitizeQuestions,
-  sanitizeVerifyGroups,
-  steerQuestions,
-  verifyQuestions,
-} from "./questions";
+import { gateQuestions, pulseQuestions, sanitizeQuestions, sanitizeVerifyGroups, steerQuestions, verifyQuestions } from "./questions";
 import type { Answer, AskOptions, AskResult, JudgmentOutcome, Question, SystemOne } from "./types";
 import { validateAnswers, validateGroups } from "./validation";
 import {
@@ -237,9 +230,7 @@ export function decideVerify(answers: Record<string, Answer>, policy: Policy): V
   // Operational failure alone never implies mismatch: reproducing a failing test is
   // a legitimate, satisfying outcome — it is recorded as context, not as a verdict.
   if (operational >= policy.confidenceFloor) {
-    reasons.push(
-      `operational failure=${operational.toFixed(2)} — the tool itself failed to run; reproducing that failure is legitimate`,
-    );
+    reasons.push(`operational failure=${operational.toFixed(2)} — the tool itself failed to run; reproducing that failure is legitimate`);
   }
 
   if (satisfied < policy.confidenceFloor && success < policy.confidenceFloor) {
@@ -498,7 +489,9 @@ export class ReflexEngine {
           return { status: "cancelled", reason: error.message, judgmentId };
         }
         const reason =
-          error instanceof JevUnavailableError ? error.message : `judgment failed: ${error instanceof Error ? error.message : String(error)}`;
+          error instanceof JevUnavailableError
+            ? error.message
+            : `judgment failed: ${error instanceof Error ? error.message : String(error)}`;
         record("unavailable", null, reason);
         return { status: "unavailable", reason, judgmentId };
       }
@@ -619,10 +612,7 @@ export class ReflexEngine {
       const verifyValid = judgment.groups?.verify ?? null;
       // verified is true only when the judgment completed; a group that merely validated within a
       // failed judgment is still not a positive verification.
-      verify =
-        verifyValid !== null
-          ? { ...decideVerify(verifyValid, this.policy), verified: false }
-          : this.fallbackVerify(judgment.reason);
+      verify = verifyValid !== null ? { ...decideVerify(verifyValid, this.policy), verified: false } : this.fallbackVerify(judgment.reason);
     }
     this.recordDecision("sanitize", sanitize, envelope.source, { judgmentId: judgment.judgmentId });
     this.recordDecision("verify", verify, envelope.source, { judgmentId: judgment.judgmentId });
@@ -660,9 +650,7 @@ export class ReflexEngine {
       return { ...decision, result: null };
     }
 
-    const repeatedAction = (input.facts?.repeatedActionCounts ?? [])
-      .filter((e) => e.count >= 2)
-      .sort((a, b) => b.count - a.count)[0];
+    const repeatedAction = (input.facts?.repeatedActionCounts ?? []).filter((e) => e.count >= 2).sort((a, b) => b.count - a.count)[0];
     let decision = decidePulse(judgment.answers!, this.policy, { repeatedAction });
 
     if (decision.action === "intervene") {
@@ -738,7 +726,10 @@ export class ReflexEngine {
       const decision: SelectDecision = { ...partial, status: "unavailable", batches: batches.length };
       this.recordDecision(
         "select",
-        { action: decision.status, reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)] },
+        {
+          action: decision.status,
+          reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)],
+        },
         subject,
         { judgmentId: lastJudgmentId },
       );
@@ -751,7 +742,10 @@ export class ReflexEngine {
     const decision: SelectDecision = { evaluated, recommended, scores, reasons, status, batches: batches.length };
     this.recordDecision(
       "select",
-      { action: decision.status, reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)] },
+      {
+        action: decision.status,
+        reasons: [String(decision.batches), String(popcount(decision.recommended)), input.catalog.catalogHash.slice(0, 16)],
+      },
       subject,
       { judgmentId: lastJudgmentId },
     );
@@ -763,7 +757,10 @@ export class ReflexEngine {
       const decision = buildExhaustiveDecision(input.manifest);
       this.recordDecision(
         "focus",
-        { action: decision.mode, reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)] },
+        {
+          action: decision.mode,
+          reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)],
+        },
         input.command.slice(0, 80),
       );
       return decision;
@@ -799,7 +796,10 @@ export class ReflexEngine {
       const decision = this.fallbackFocus(input.manifest);
       this.recordDecision(
         "focus",
-        { action: decision.mode, reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)] },
+        {
+          action: decision.mode,
+          reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)],
+        },
         subject,
         { judgmentId: lastJudgmentId },
       );
@@ -811,7 +811,10 @@ export class ReflexEngine {
     const decision = assembleFocusDecision(input.manifest, inner, status, batches.length);
     this.recordDecision(
       "focus",
-      { action: decision.mode, reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)] },
+      {
+        action: decision.mode,
+        reasons: [String(decision.batches), String(popcount(decision.selected)), input.manifest.catalogHash.slice(0, 16)],
+      },
       subject,
       { judgmentId: lastJudgmentId },
     );

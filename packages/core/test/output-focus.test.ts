@@ -278,7 +278,12 @@ describe("ReflexEngine.focus", () => {
 
   test("partial batch failure keeps earlier batch scores and reports partial", async () => {
     const manifest = manifestFrom(
-      ...Array.from({ length: 3 }, (_, i) => `section ${i} with enough text to force its own batch because each serialized pair of questions exceeds the character budget`.padEnd(3_000, " ")),
+      ...Array.from({ length: 3 }, (_, i) =>
+        `section ${i} with enough text to force its own batch because each serialized pair of questions exceeds the character budget`.padEnd(
+          3_000,
+          " ",
+        ),
+      ),
     );
     let call = 0;
     const { engine, mock } = focusEngineWith((_state, questions) => {

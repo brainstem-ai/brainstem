@@ -57,7 +57,13 @@ describe("createReflexes — no journal required", () => {
     expect(observed.sanitize.action).toBe("pass");
 
     const content = Array.from({ length: 40 }, (_, i) => `line ${i} with enough text to clear the min-chars floor`).join("\n\n");
-    const focused = await reflexes.focus({ task: "count how many lines exist", command: "cat", outcome: "ok", recentFindings: [], content });
+    const focused = await reflexes.focus({
+      task: "count how many lines exist",
+      command: "cat",
+      outcome: "ok",
+      recentFindings: [],
+      content,
+    });
     expect(focused.text.length).toBeGreaterThan(0);
   });
 });
@@ -113,7 +119,13 @@ describe("createReflexes — focus", () => {
     });
     const reflexes = createReflexes({ judge: mock, root: "/tmp" });
 
-    const focused = await reflexes.focus({ task: "what does the BETA section say", command: "cat", outcome: "ok", recentFindings: [], content });
+    const focused = await reflexes.focus({
+      task: "what does the BETA section say",
+      command: "cat",
+      outcome: "ok",
+      recentFindings: [],
+      content,
+    });
     expect(focused.mode).toBe("select");
     expect(focused.text).toContain("BETA");
     expect(focused.text).not.toContain("ALPHA");
@@ -159,7 +171,14 @@ describe("createReflexes — policy override", () => {
     });
     const reflexes = createReflexes({ judge: mock, root: "/tmp", policy: { gate: { autoConfidence: 0.99 } as never } });
 
-    const observed = await reflexes.observe({ task: "t", source: "tool:read", actionSummary: "read", status: "ok", truncated: false, content: "benign" });
+    const observed = await reflexes.observe({
+      task: "t",
+      source: "tool:read",
+      actionSummary: "read",
+      status: "ok",
+      truncated: false,
+      content: "benign",
+    });
     expect(observed.sanitize.action).toBe("pass");
   });
 });

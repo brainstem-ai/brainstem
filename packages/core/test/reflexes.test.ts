@@ -20,11 +20,7 @@ describe("decidePulse", () => {
   });
 
   test("intervenes when the agent repeats itself, naming the repeated action", () => {
-    const d = decidePulse(
-      { ...healthyPulse, repeating: noulAnswer(0.85) },
-      POLICY,
-      { repeatedAction: { label: "npm test", count: 3 } },
-    );
+    const d = decidePulse({ ...healthyPulse, repeating: noulAnswer(0.85) }, POLICY, { repeatedAction: { label: "npm test", count: 3 } });
     expect(d.action).toBe("intervene");
     expect(d.reasons[0]).toBe("repeating: npm test x3");
   });
@@ -36,11 +32,9 @@ describe("decidePulse", () => {
   });
 
   test("does not intervene for repeating when the approach changed", () => {
-    const d = decidePulse(
-      { ...healthyPulse, repeating: noulAnswer(0.85), approach_changed: noulAnswer(0.9) },
-      POLICY,
-      { repeatedAction: { label: "npm test", count: 3 } },
-    );
+    const d = decidePulse({ ...healthyPulse, repeating: noulAnswer(0.85), approach_changed: noulAnswer(0.9) }, POLICY, {
+      repeatedAction: { label: "npm test", count: 3 },
+    });
     expect(d.action).toBe("continue");
   });
 
@@ -57,10 +51,7 @@ describe("decidePulse", () => {
   });
 
   test("stops when continuing is no longer worth it", () => {
-    const d = decidePulse(
-      { ...healthyPulse, worth_continuing: scoreAnswer(0.0, 0.9), progressing: noulAnswer(0.2) },
-      POLICY,
-    );
+    const d = decidePulse({ ...healthyPulse, worth_continuing: scoreAnswer(0.0, 0.9), progressing: noulAnswer(0.2) }, POLICY);
     expect(d.action).toBe("stop");
   });
 
@@ -137,26 +128,17 @@ describe("decideVerify", () => {
 
 describe("decideSteer", () => {
   test("routes to mini at high confidence", () => {
-    const d = decideSteer(
-      { model_tier: choiceAnswer("mini", 0.9, { mini: 0.9, frontier: 0.1 }) },
-      POLICY,
-    );
+    const d = decideSteer({ model_tier: choiceAnswer("mini", 0.9, { mini: 0.9, frontier: 0.1 }) }, POLICY);
     expect(d.tier).toBe("mini");
   });
 
   test("stays frontier when mini confidence is below the bar", () => {
-    const d = decideSteer(
-      { model_tier: choiceAnswer("mini", 0.5, { mini: 0.5, frontier: 0.5 }) },
-      POLICY,
-    );
+    const d = decideSteer({ model_tier: choiceAnswer("mini", 0.5, { mini: 0.5, frontier: 0.5 }) }, POLICY);
     expect(d.tier).toBe("frontier");
   });
 
   test("stays frontier when frontier is chosen", () => {
-    const d = decideSteer(
-      { model_tier: choiceAnswer("frontier", 0.95, { mini: 0.05, frontier: 0.95 }) },
-      POLICY,
-    );
+    const d = decideSteer({ model_tier: choiceAnswer("frontier", 0.95, { mini: 0.05, frontier: 0.95 }) }, POLICY);
     expect(d.tier).toBe("frontier");
   });
 

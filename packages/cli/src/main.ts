@@ -3,7 +3,15 @@ import { createInterface } from "node:readline";
 import { statSync } from "node:fs";
 import { createModels } from "@earendil-works/pi-ai";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
-import { DEFAULT_TRUST, jevSystemOne, loadJournal, policyForTrust, type ApprovalHandler, type ApprovalRequest, type ApprovalResolution } from "@brainstem/core";
+import {
+  DEFAULT_TRUST,
+  jevSystemOne,
+  loadJournal,
+  policyForTrust,
+  type ApprovalHandler,
+  type ApprovalRequest,
+  type ApprovalResolution,
+} from "@brainstem/core";
 import { createHarness } from "./harness";
 import type { FocusRolloutMode } from "./output/present";
 import { resolveModels, type ResolvedModels } from "./models";
@@ -54,8 +62,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--skill-root") {
       const root = argv[++i];
       if (root) args.skillRoots.push(root);
-    }
-    else if (a === "--focus-mode") args.focusMode = (argv[++i] ?? args.focusMode) as FocusRolloutMode;
+    } else if (a === "--focus-mode") args.focusMode = (argv[++i] ?? args.focusMode) as FocusRolloutMode;
     else if (a === "--help" || a === "-h") args.help = true;
   }
   return args;

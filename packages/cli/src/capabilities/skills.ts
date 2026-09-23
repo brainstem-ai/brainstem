@@ -17,7 +17,12 @@ interface ParsedFrontmatter {
 }
 
 function normalizeSkillId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "") || "skill";
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-|-$/g, "") || "skill"
+  );
 }
 
 function parseFrontmatter(raw: string, filePath: string): { frontmatter: ParsedFrontmatter; instructions: string } {
@@ -86,7 +91,10 @@ function parseFrontmatter(raw: string, filePath: string): { frontmatter: ParsedF
     (frontmatter[currentListKey.key] as string[]) = currentListKey.values;
   }
 
-  const instructions = lines.slice(endIndex + 1).join("\n").trim();
+  const instructions = lines
+    .slice(endIndex + 1)
+    .join("\n")
+    .trim();
   return { frontmatter, instructions };
 }
 

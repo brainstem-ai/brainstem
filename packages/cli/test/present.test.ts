@@ -140,13 +140,7 @@ describe("presentFocused", () => {
 
 describe("presentArtifact", () => {
   test('rollout "off" always returns the naive view, even when a "select" decision is supplied', () => {
-    const content = [
-      "alpha section content here",
-      "",
-      "beta section content here",
-      "",
-      "gamma section content here",
-    ].join("\n");
+    const content = ["alpha section content here", "", "beta section content here", "", "gamma section content here"].join("\n");
     const manifest = manifestOf(content);
     const decision = decisionWith(manifest, "select", [0]);
 
@@ -164,13 +158,7 @@ describe("presentArtifact", () => {
   });
 
   test('rollout "on" with a real decision presents the focused view', () => {
-    const content = [
-      "alpha section content here",
-      "",
-      "beta section content here",
-      "",
-      "gamma section content here",
-    ].join("\n");
+    const content = ["alpha section content here", "", "beta section content here", "", "gamma section content here"].join("\n");
     const manifest = manifestOf(content);
     const decision = decisionWith(manifest, "select", [1]);
     const view = presentArtifact(content, "art_11", { rollout: "on", manifest, decision });

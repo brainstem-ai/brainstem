@@ -29,16 +29,17 @@ export interface ReplayReport {
   unsupportedReasons: Record<string, number>;
 }
 
-const DECIDERS: Record<string, (answers: Record<string, Answer>, policy: Policy) => { action?: string; tier?: string; reasons: string[] }> = {
-  gate: (answers, policy) => decideGate(answers, policy),
-  sanitize: (answers, policy) => decideSanitize(answers, policy),
-  verify: (answers, policy) => decideVerify(answers, policy),
-  pulse: (answers, policy) => decidePulse(answers, policy),
-  steer: (answers, policy) => {
-    const d = decideSteer(answers, policy);
-    return { action: d.tier, reasons: d.reasons };
-  },
-};
+const DECIDERS: Record<string, (answers: Record<string, Answer>, policy: Policy) => { action?: string; tier?: string; reasons: string[] }> =
+  {
+    gate: (answers, policy) => decideGate(answers, policy),
+    sanitize: (answers, policy) => decideSanitize(answers, policy),
+    verify: (answers, policy) => decideVerify(answers, policy),
+    pulse: (answers, policy) => decidePulse(answers, policy),
+    steer: (answers, policy) => {
+      const d = decideSteer(answers, policy);
+      return { action: d.tier, reasons: d.reasons };
+    },
+  };
 
 // select/focus decisions cannot be genuinely replayed with today's journal
 // schema: decideSelect/decideFocus need the full capability catalog or

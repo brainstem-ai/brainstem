@@ -92,10 +92,7 @@ function focusQuestionSize(candidate: OutputSection): number {
   return JSON.stringify(buildFocusQuestions([candidate])).length;
 }
 
-export function batchSections(
-  candidates: readonly OutputSection[],
-  budget: number = FOCUS_BATCH_CHAR_BUDGET,
-): OutputSection[][] {
+export function batchSections(candidates: readonly OutputSection[], budget: number = FOCUS_BATCH_CHAR_BUDGET): OutputSection[][] {
   const batches: OutputSection[][] = [];
   let current: OutputSection[] = [];
   let currentSize = 0;
@@ -119,7 +116,12 @@ export function decideFocus(
   answers: Record<string, Answer>,
   policy: Policy,
   budgetChars: number,
-): { selected: CapabilityBitmap; evaluated: CapabilityBitmap; scores: Record<string, number>; sectionReasons: Record<string, FocusSectionReason> } {
+): {
+  selected: CapabilityBitmap;
+  evaluated: CapabilityBitmap;
+  scores: Record<string, number>;
+  sectionReasons: Record<string, FocusSectionReason>;
+} {
   const indexById = new Map(manifest.entries.map((s, i) => [s.id, i] as const));
   const threshold = policy.focus.relevanceNoul;
 
@@ -218,11 +220,7 @@ export function decideFocus(
   return { selected, evaluated, scores, sectionReasons };
 }
 
-export function decideFocusMode(
-  evaluated: CapabilityBitmap,
-  selected: CapabilityBitmap,
-  _catalog: SectionManifest,
-): FocusMode {
+export function decideFocusMode(evaluated: CapabilityBitmap, selected: CapabilityBitmap, _catalog: SectionManifest): FocusMode {
   if (!isEmpty(selected)) return "select";
   if (!isEmpty(evaluated)) return "compute_or_retrieve";
   return "full";
@@ -264,7 +262,12 @@ export function buildExhaustiveDecision(manifest: SectionManifest): FocusDecisio
 
 export function assembleFocusDecision(
   manifest: SectionManifest,
-  inner: { selected: CapabilityBitmap; evaluated: CapabilityBitmap; scores: Record<string, number>; sectionReasons: Record<string, FocusSectionReason> },
+  inner: {
+    selected: CapabilityBitmap;
+    evaluated: CapabilityBitmap;
+    scores: Record<string, number>;
+    sectionReasons: Record<string, FocusSectionReason>;
+  },
   status: FocusDecision["status"],
   batches: number,
 ): FocusDecision {
@@ -277,12 +280,7 @@ export function assembleFocusDecision(
     selected: inner.selected,
     scores: inner.scores,
     sectionReasons: inner.sectionReasons,
-    reasons: [
-      `mode=${mode}`,
-      `evaluated=${popcount(inner.evaluated)}`,
-      `selected=${popcount(inner.selected)}`,
-      `batches=${batches}`,
-    ],
+    reasons: [`mode=${mode}`, `evaluated=${popcount(inner.evaluated)}`, `selected=${popcount(inner.selected)}`, `batches=${batches}`],
     batches,
   };
 }

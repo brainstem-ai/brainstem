@@ -53,7 +53,11 @@ function fitWholeLines(lines: string[], capChars: number): { text: string; count
  * sequence at either edge, and always making forward progress (start <
  * returned endByte, unless start === totalBytes already).
  */
-function sliceLineByBytes(line: string, startByte: number, maxBytes: number): { text: string; startByte: number; endByte: number; totalBytes: number } {
+function sliceLineByBytes(
+  line: string,
+  startByte: number,
+  maxBytes: number,
+): { text: string; startByte: number; endByte: number; totalBytes: number } {
   const buf = Buffer.from(line, "utf8");
   const totalBytes = buf.length;
   const start = Math.max(0, Math.min(startByte, totalBytes));
@@ -112,11 +116,18 @@ function entryOutcome(captureComplete: boolean): "complete" | "truncated-capture
 export function makeRecoveryTools(deps: RecoveryToolDeps): AgentTool[] {
   const readParams = Type.Object({
     id: Type.String({ description: "Artifact id from a capture notice" }),
-    stream: Type.Optional(Type.String({ description: "Which captured stream to read (e.g. \"stdout\", \"stderr\", or \"output\"); defaults to stdout/output" })),
+    stream: Type.Optional(
+      Type.String({ description: 'Which captured stream to read (e.g. "stdout", "stderr", or "output"); defaults to stdout/output' }),
+    ),
     startLine: Type.Optional(Type.Number({ description: "First line to return (1-indexed, default 1)" })),
-    lineCount: Type.Optional(Type.Number({ description: `Number of lines to return (default ${READ_DEFAULT_LINES}, max ${READ_MAX_LINES})` })),
+    lineCount: Type.Optional(
+      Type.Number({ description: `Number of lines to return (default ${READ_DEFAULT_LINES}, max ${READ_MAX_LINES})` }),
+    ),
     startByteInLine: Type.Optional(
-      Type.Number({ description: "Resume a single line that was too long to fit in one page, at this byte offset within that line (from a previous page's continuation notice)." }),
+      Type.Number({
+        description:
+          "Resume a single line that was too long to fit in one page, at this byte offset within that line (from a previous page's continuation notice).",
+      }),
     ),
   });
   const readOutput: AgentTool<typeof readParams> = {
@@ -137,7 +148,12 @@ export function makeRecoveryTools(deps: RecoveryToolDeps): AgentTool[] {
       const stream = defaultStream(entry.content, params.stream);
       if (stream === undefined) {
         return {
-          content: [{ type: "text", text: `unknown stream "${params.stream}" for artifact ${params.id}: available streams are ${streamsList(entry.content)}` }],
+          content: [
+            {
+              type: "text",
+              text: `unknown stream "${params.stream}" for artifact ${params.id}: available streams are ${streamsList(entry.content)}`,
+            },
+          ],
           details: { outcome: "unknown-stream" },
         };
       }
@@ -201,10 +217,17 @@ export function makeRecoveryTools(deps: RecoveryToolDeps): AgentTool[] {
 
   const searchParams = Type.Object({
     id: Type.String({ description: "Artifact id from a capture notice" }),
-    stream: Type.Optional(Type.String({ description: "Which captured stream to search (e.g. \"stdout\", \"stderr\", or \"output\"); defaults to stdout/output" })),
+    stream: Type.Optional(
+      Type.String({ description: 'Which captured stream to search (e.g. "stdout", "stderr", or "output"); defaults to stdout/output' }),
+    ),
     pattern: Type.String({ description: "Regular expression to search for" }),
     limit: Type.Optional(Type.Number({ description: `Maximum matches to return (default ${SEARCH_DEFAULT_LIMIT})` })),
-    startLine: Type.Optional(Type.Number({ description: "Resume scanning from this line (1-indexed, default 1) — use the totalScanned receipt from a truncated search to continue coverage without gaps or re-scanning." })),
+    startLine: Type.Optional(
+      Type.Number({
+        description:
+          "Resume scanning from this line (1-indexed, default 1) — use the totalScanned receipt from a truncated search to continue coverage without gaps or re-scanning.",
+      }),
+    ),
   });
   const searchOutput: AgentTool<typeof searchParams> = {
     name: "search_output",
@@ -224,7 +247,12 @@ export function makeRecoveryTools(deps: RecoveryToolDeps): AgentTool[] {
       const stream = defaultStream(entry.content, params.stream);
       if (stream === undefined) {
         return {
-          content: [{ type: "text", text: `unknown stream "${params.stream}" for artifact ${params.id}: available streams are ${streamsList(entry.content)}` }],
+          content: [
+            {
+              type: "text",
+              text: `unknown stream "${params.stream}" for artifact ${params.id}: available streams are ${streamsList(entry.content)}`,
+            },
+          ],
           details: { outcome: "unknown-stream" },
         };
       }
@@ -286,7 +314,8 @@ export function makeRecoveryTools(deps: RecoveryToolDeps): AgentTool[] {
 
       const notes: string[] = [];
       if (result.scanClipped) notes.push("scan bounded by size — matches beyond the scanned range are not yet known");
-      if (pageBounded) notes.push(`page bounded — showing ${deliveredMatches.length} of ${rebasedMatches.length} matches found in this range`);
+      if (pageBounded)
+        notes.push(`page bounded — showing ${deliveredMatches.length} of ${rebasedMatches.length} matches found in this range`);
       const header = `artifact ${params.id} stream ${stream} search "${params.pattern}" from line ${startLine}: ${result.totalMatches} match(es) found in lines ${startLine}-${scannedTo} of ${allLines.length} (${entryOutcome(complete)}${notes.length > 0 ? `, ${notes.join("; ")}` : ""})`;
       const continuationNotice = resumeLine !== undefined ? `\n[brainstem] continue with startLine=${resumeLine} to cover the rest.` : "";
       const text =
@@ -295,7 +324,13 @@ export function makeRecoveryTools(deps: RecoveryToolDeps): AgentTool[] {
           : `${header}\n${deliveredMatches.map((m) => `${m.line}: ${m.text}`).join("\n")}${continuationNotice}`;
       return {
         content: [{ type: "text", text }],
-        details: { outcome: "ok", totalMatches: result.totalMatches, truncated: result.truncated, scannedTo, delivered: deliveredMatches.length },
+        details: {
+          outcome: "ok",
+          totalMatches: result.totalMatches,
+          truncated: result.truncated,
+          scannedTo,
+          delivered: deliveredMatches.length,
+        },
       };
     },
   };

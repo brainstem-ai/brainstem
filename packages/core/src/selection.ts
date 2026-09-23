@@ -1,10 +1,4 @@
-import {
-  createBitmap,
-  getBit,
-  intersection,
-  setBit,
-  type CapabilityBitmap,
-} from "./bitmap";
+import { createBitmap, getBit, intersection, setBit, type CapabilityBitmap } from "./bitmap";
 import type { CapabilityCatalog, CapabilityDescriptor } from "./capabilities";
 import type { Policy } from "./policy";
 import { noul, type Answer, type Question } from "./types";
@@ -98,10 +92,7 @@ function selectQuestionSize(candidate: SelectableCapability): number {
   return JSON.stringify(buildSelectQuestions([candidate])).length;
 }
 
-export function batchCandidates(
-  candidates: SelectableCapability[],
-  budget: number = SELECT_BATCH_CHAR_BUDGET,
-): SelectableCapability[][] {
+export function batchCandidates(candidates: SelectableCapability[], budget: number = SELECT_BATCH_CHAR_BUDGET): SelectableCapability[][] {
   const batches: SelectableCapability[][] = [];
   let current: SelectableCapability[] = [];
   let currentSize = 0;
@@ -184,4 +175,3 @@ export function buildFallbackDecision(
   }
   return { evaluated, recommended, scores, reasons };
 }
-

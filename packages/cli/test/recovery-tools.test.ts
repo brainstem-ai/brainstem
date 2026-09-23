@@ -21,11 +21,7 @@ function setup() {
   return { store, readOutput: readOutput!, searchOutput: searchOutput! };
 }
 
-function putArtifact(
-  store: LocalArtifactStore,
-  content: Record<string, string>,
-  overrides: Partial<ArtifactMeta> = {},
-): string {
+function putArtifact(store: LocalArtifactStore, content: Record<string, string>, overrides: Partial<ArtifactMeta> = {}): string {
   const id = newId("art");
   const streams: ArtifactMeta["streams"] = {};
   for (const [name, text] of Object.entries(content)) {
@@ -95,7 +91,10 @@ async function reconstructRead(
       return out; // a partial-line completion can legitimately advance one line past the real end
     }
     const lines = raw.split("\n");
-    const body = lines.slice(1).join("\n").replace(/\n\[brainstem\].*$/s, "");
+    const body = lines
+      .slice(1)
+      .join("\n")
+      .replace(/\n\[brainstem\].*$/s, "");
 
     out += resumingMidLine ? body : (out.length > 0 ? "\n" : "") + body;
 
@@ -213,8 +212,16 @@ describe("R5/R6: read_output — full recovery, byte-precise pagination, honest 
     const page2 = (await readOutput.execute("x", { id, startLine: 1, startByteInLine: resumeAt })) as {
       content: { text: string }[];
     };
-    const body1 = text1.split("\n").slice(1).join("\n").replace(/\n\[brainstem\].*$/s, "");
-    const body2 = textOf(page2).split("\n").slice(1).join("\n").replace(/\n\[brainstem\].*$/s, "");
+    const body1 = text1
+      .split("\n")
+      .slice(1)
+      .join("\n")
+      .replace(/\n\[brainstem\].*$/s, "");
+    const body2 = textOf(page2)
+      .split("\n")
+      .slice(1)
+      .join("\n")
+      .replace(/\n\[brainstem\].*$/s, "");
     expect(body1 + body2).toBe(bigLine);
   });
 
@@ -293,7 +300,8 @@ async function reconstructSearchMatches(
       content: { text: string }[];
       details: { outcome: string };
     };
-    if (result.details.outcome !== "ok") throw new Error(`reconstructSearchMatches: unexpected outcome ${result.details.outcome} at page ${i}`);
+    if (result.details.outcome !== "ok")
+      throw new Error(`reconstructSearchMatches: unexpected outcome ${result.details.outcome} at page ${i}`);
     const raw = textOf(result);
     for (const m of raw.matchAll(/^(\d+): /gm)) found.push(Number(m[1]));
     const cont = raw.match(/startLine=(\d+)/);

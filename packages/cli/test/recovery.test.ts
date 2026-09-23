@@ -5,7 +5,16 @@ import { join } from "node:path";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { ARTIFACT_SCHEMA_VERSION, loadJournal, mockSystemOne, newId, noulAnswer, choiceAnswer, scoreAnswer, type Answer } from "@brainstem/core";
+import {
+  ARTIFACT_SCHEMA_VERSION,
+  loadJournal,
+  mockSystemOne,
+  newId,
+  noulAnswer,
+  choiceAnswer,
+  scoreAnswer,
+  type Answer,
+} from "@brainstem/core";
 import { createHarness } from "../src/harness";
 
 const { bashCommands } = vi.hoisted(() => ({ bashCommands: [] as string[] }));
@@ -37,10 +46,7 @@ const NO_USAGE = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-function assistantMessage(
-  content: AssistantMessage["content"],
-  stopReason: AssistantMessage["stopReason"],
-): AssistantMessage {
+function assistantMessage(content: AssistantMessage["content"], stopReason: AssistantMessage["stopReason"]): AssistantMessage {
   return {
     role: "assistant",
     content,
@@ -82,9 +88,7 @@ function readJournal(path: string): Record<string, unknown>[] {
 }
 
 function artifactIdFor(journalPath: string, toolCallId: string): string {
-  const event = readJournal(journalPath).find(
-    (e) => e.t === "artifacts" && e.toolCallId === toolCallId,
-  );
+  const event = readJournal(journalPath).find((e) => e.t === "artifacts" && e.toolCallId === toolCallId);
   expect(event, `no artifacts event for ${toolCallId}`).toBeDefined();
   return event!.artifactId as string;
 }
@@ -157,7 +161,8 @@ describe("recovery integration", () => {
     let step = 0;
     const stream: StreamFn = (model, context, opts) => {
       step += 1;
-      if (step === 1) return toolCallStep("tc1", "bash", { command: `for i in $(seq 1 50); do echo "line-$i"; done` })(model, context, opts);
+      if (step === 1)
+        return toolCallStep("tc1", "bash", { command: `for i in $(seq 1 50); do echo "line-$i"; done` })(model, context, opts);
       if (step === 2) return toolCallStep("tc2", "read", { path: "injected.txt" })(model, context, opts);
       if (step === 3)
         return toolCallStep("tc3", "read_output", { id: artifactIdFor(journalPath, "tc1"), startLine: 45, lineCount: 6 })(
@@ -173,22 +178,10 @@ describe("recovery integration", () => {
         );
       if (step === 5) return toolCallStep("tc5", "read_output", { id: "art_does-not-exist" })(model, context, opts);
       if (step === 6)
-        return toolCallStep("tc6", "search_output", { id: artifactIdFor(journalPath, "tc1"), pattern: "line-42" })(
-          model,
-          context,
-          opts,
-        );
+        return toolCallStep("tc6", "search_output", { id: artifactIdFor(journalPath, "tc1"), pattern: "line-42" })(model, context, opts);
       if (step === 7)
-        return toolCallStep("tc7", "search_output", { id: artifactIdFor(journalPath, "tc1"), pattern: "(unclosed" })(
-          model,
-          context,
-          opts,
-        );
-      return scriptedStream([assistantMessage([{ type: "text", text: "recovered everything" }], "stop")])(
-        model,
-        context,
-        opts,
-      );
+        return toolCallStep("tc7", "search_output", { id: artifactIdFor(journalPath, "tc1"), pattern: "(unclosed" })(model, context, opts);
+      return scriptedStream([assistantMessage([{ type: "text", text: "recovered everything" }], "stop")])(model, context, opts);
     };
 
     const { agent } = createHarness({
@@ -222,9 +215,7 @@ describe("recovery integration", () => {
 
     // tc3: read_output recovers lines 45-50 from the artifact without rerunning bash.
     const tc3 = toolResultText(messages, "tc3");
-    expect(tc3).toMatch(
-      new RegExp(`artifact ${artifactIdFor(journalPath, "tc1")} stream stdout lines 45-50 of 50 \\(complete\\)`),
-    );
+    expect(tc3).toMatch(new RegExp(`artifact ${artifactIdFor(journalPath, "tc1")} stream stdout lines 45-50 of 50 \\(complete\\)`));
     expect(tc3).toContain("line-45");
     expect(tc3).toContain("line-50");
     expect(bashCommands).toHaveLength(1);

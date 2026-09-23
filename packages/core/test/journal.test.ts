@@ -55,14 +55,31 @@ describe("journal (schema v2)", () => {
         answers: { safe: { type: "noul", noul: 0.05 } },
       },
     });
-    journal.append({ t: "decision", v: 2, judgmentId: "j_a", ts: 4, reflex: "gate", action: "auto", reasons: ["disposition auto_run at confidence 0.95"] });
+    journal.append({
+      t: "decision",
+      v: 2,
+      judgmentId: "j_a",
+      ts: 4,
+      reflex: "gate",
+      action: "auto",
+      reasons: ["disposition auto_run at confidence 0.95"],
+    });
     journal.append({
       t: "tool_observation",
       v: 2,
       toolCallId: "tc1",
       turnId: "turn_a",
       ts: 5,
-      observation: { toolCallId: "tc1", tool: "bash", argsSummary: { command: "npm test" }, status: "ok", exitCode: 1, durationMs: 2100, excerpt: "1 failing", truncated: false },
+      observation: {
+        toolCallId: "tc1",
+        tool: "bash",
+        argsSummary: { command: "npm test" },
+        status: "ok",
+        exitCode: 1,
+        durationMs: 2100,
+        excerpt: "1 failing",
+        truncated: false,
+      },
       deliveredExcerpt: "1 failing",
       deliveredTruncated: false,
     });
@@ -103,7 +120,17 @@ describe("journal (schema v2)", () => {
     const policy = policyForTrust(0.5);
     const lines = [
       { t: "session_start", v: 2, sessionId: "sess_f", ts: 1, trust: 0.5, policySnapshot: policy, policyHash: hashAction(policy) },
-      { t: "approval", v: 2, approvalId: "appr_1", ts: 2, status: "requested", taskId: "task_f", toolCallId: "tc9", actionHash: "abc", reasons: ["ask"] },
+      {
+        t: "approval",
+        v: 2,
+        approvalId: "appr_1",
+        ts: 2,
+        status: "requested",
+        taskId: "task_f",
+        toolCallId: "tc9",
+        actionHash: "abc",
+        reasons: ["ask"],
+      },
       { t: "artifacts", v: 2, artifactId: "art_1", ts: 3, toolCallId: "tc9", contentHash: "h", captureComplete: true, byteCount: 12 },
     ];
     writeFileSync(path, lines.map((l) => JSON.stringify(l)).join("\n") + "\n", "utf8");
@@ -130,7 +157,16 @@ describe("journal (schema v2)", () => {
       focusMode: "select",
       focusStatus: "ok",
     };
-    const legacy = { t: "artifacts", v: 2, artifactId: "art_3", ts: 5, toolCallId: "tc11", contentHash: "h3", captureComplete: false, byteCount: 10 };
+    const legacy = {
+      t: "artifacts",
+      v: 2,
+      artifactId: "art_3",
+      ts: 5,
+      toolCallId: "tc11",
+      contentHash: "h3",
+      captureComplete: false,
+      byteCount: 10,
+    };
     writeFileSync(path, [withFocus, legacy].map((l) => JSON.stringify(l)).join("\n") + "\n", "utf8");
 
     const events = loadJournal(path);

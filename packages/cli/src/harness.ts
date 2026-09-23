@@ -140,9 +140,7 @@ function actionIdentity(tool: string, args: unknown, extra: { target?: string; p
     v: ACTION_HASH_SCHEMA_VERSION,
     tool,
     ...(argsSummaryFor(args) as object),
-    ...(typeof content === "string"
-      ? { contentDigest: contentHash(content), contentLength: Buffer.byteLength(content, "utf8") }
-      : {}),
+    ...(typeof content === "string" ? { contentDigest: contentHash(content), contentLength: Buffer.byteLength(content, "utf8") } : {}),
     ...(extra.target !== undefined ? { target: extra.target } : {}),
     ...(extra.preconditionDigest !== undefined ? { preconditionDigest: extra.preconditionDigest } : {}),
   };
@@ -290,12 +288,7 @@ export function createHarness(options: HarnessOptions): Harness {
     return lines;
   }
 
-  function emitObservation(
-    obs: ToolObservation,
-    deliveredExcerpt: string,
-    deliveredTruncated: boolean,
-    deliveredWhy?: string,
-  ): void {
+  function emitObservation(obs: ToolObservation, deliveredExcerpt: string, deliveredTruncated: boolean, deliveredWhy?: string): void {
     recorder.recordObservation(obs);
     journal.append({
       t: "tool_observation",
@@ -310,13 +303,7 @@ export function createHarness(options: HarnessOptions): Harness {
     });
   }
 
-  function emitBlockedObservation(
-    toolCallId: string,
-    tool: string,
-    args: unknown,
-    delivered: string,
-    why: string,
-  ): void {
+  function emitBlockedObservation(toolCallId: string, tool: string, args: unknown, delivered: string, why: string): void {
     recorder.recordAction(hashAction(actionIdentity(tool, args)), actionLabel(tool, args));
     emitObservation(
       {
@@ -358,9 +345,7 @@ export function createHarness(options: HarnessOptions): Harness {
     // never be reinterpreted as approving a different target or payload.
     const approvalId = newId("appr");
     const taskId = recorder.currentTask?.id ?? "";
-    const actionHash = hashAction(
-      actionIdentity(tool, args, { target: prepared.target, preconditionDigest: prepared.preconditionDigest }),
-    );
+    const actionHash = hashAction(actionIdentity(tool, args, { target: prepared.target, preconditionDigest: prepared.preconditionDigest }));
     const request: ApprovalRequest = {
       id: approvalId,
       taskId,
@@ -636,9 +621,7 @@ export function createHarness(options: HarnessOptions): Harness {
         // comment). Consumed once by the descriptor-relative executor,
         // binding the write's PREIMAGE through execution the same way its
         // TARGET is bound through execution.
-        const runWriteApproval = async (
-          reasons: string[],
-        ): Promise<{ block: true; reason: string } | undefined> => {
+        const runWriteApproval = async (reasons: string[]): Promise<{ block: true; reason: string } | undefined> => {
           const result = await runApproval(toolCallId, toolCall.name, args, reasons, signal, writeApprovalPrepared());
           if (result === undefined) {
             writePreconditions.set(toolCallId, change?.existingDigest ?? ABSENT_DIGEST);

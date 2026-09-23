@@ -27,10 +27,7 @@ const NO_USAGE = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-function assistantMessage(
-  content: AssistantMessage["content"],
-  stopReason: AssistantMessage["stopReason"],
-): AssistantMessage {
+function assistantMessage(content: AssistantMessage["content"], stopReason: AssistantMessage["stopReason"]): AssistantMessage {
   return {
     role: "assistant",
     content,

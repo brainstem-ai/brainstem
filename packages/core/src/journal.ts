@@ -160,9 +160,7 @@ export function loadJournal(path: string): JournalEvent[] {
     .map((line, index) => {
       const event = JSON.parse(line) as { v?: number };
       if (event.v !== JOURNAL_SCHEMA_VERSION) {
-        throw new Error(
-          `unknown journal schema version ${String(event.v)} at ${path}:${index + 1} (expected v${JOURNAL_SCHEMA_VERSION})`,
-        );
+        throw new Error(`unknown journal schema version ${String(event.v)} at ${path}:${index + 1} (expected v${JOURNAL_SCHEMA_VERSION})`);
       }
       return event as JournalEvent;
     });

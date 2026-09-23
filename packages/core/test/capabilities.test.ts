@@ -109,17 +109,11 @@ describe("computeActive", () => {
     const result = computeActive(catalog, ws);
     expect(toIds(result.active, catalog.entries)).toEqual(["tool:solo"]);
     expect(result.unmetExplicit).toEqual(["skill:explicit"]);
-    expect(result.dropped).toEqual([
-      { id: "skill:opt", reason: expect.stringContaining('requires "tool:ghosted"') },
-    ]);
+    expect(result.dropped).toEqual([{ id: "skill:opt", reason: expect.stringContaining('requires "tool:ghosted"') }]);
   });
 
   test("transitive rejections cascade", () => {
-    const descriptors = [
-      desc({ id: "a", requires: ["b"] }),
-      desc({ id: "b", requires: ["c"] }),
-      desc({ id: "c", alwaysAvailable: false }),
-    ];
+    const descriptors = [desc({ id: "a", requires: ["b"] }), desc({ id: "b", requires: ["c"] }), desc({ id: "c", alwaysAvailable: false })];
     const { catalog, ws } = build(descriptors, { baseline: ["a"], available: ["a", "b"] });
     const result = computeActive(catalog, ws);
     expect(result.active.bitLength).toBeGreaterThan(0);

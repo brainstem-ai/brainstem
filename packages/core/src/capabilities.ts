@@ -1,13 +1,5 @@
 import { hashAction } from "./evidence";
-import {
-  cloneBitmap,
-  createBitmap,
-  fromIds,
-  getBit,
-  setBit,
-  toIds,
-  type CapabilityBitmap,
-} from "./bitmap";
+import { cloneBitmap, createBitmap, fromIds, getBit, setBit, toIds, type CapabilityBitmap } from "./bitmap";
 
 export const CAPCAT_NAMESPACE = "capcat/1";
 export const SECT_NAMESPACE = "sect/1";
@@ -29,10 +21,7 @@ export interface CapabilityCatalog {
   entries: readonly CapabilityDescriptor[];
 }
 
-export function compileCatalog(
-  descriptors: CapabilityDescriptor[],
-  namespace: string = CAPCAT_NAMESPACE,
-): CapabilityCatalog {
+export function compileCatalog(descriptors: CapabilityDescriptor[], namespace: string = CAPCAT_NAMESPACE): CapabilityCatalog {
   const sorted = [...descriptors].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const byId = new Map<string, CapabilityDescriptor>();
   for (const d of sorted) {
@@ -191,8 +180,7 @@ export function workingSetFromIds(
     recommended?: string[];
   },
 ): Omit<WorkingSet, "active"> {
-  const make = (ids?: string[]): CapabilityBitmap =>
-    fromIds(ids ?? [], catalog.entries, catalog.catalogHash);
+  const make = (ids?: string[]): CapabilityBitmap => fromIds(ids ?? [], catalog.entries, catalog.catalogHash);
   return {
     available: make(masks.available),
     baseline: make(masks.baseline),

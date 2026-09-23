@@ -196,9 +196,7 @@ describe("replayJournal", () => {
   });
 
   test("a decision whose judgmentId resolves to no reflex event is unsupported, not a crash", () => {
-    const events: JournalEvent[] = [
-      { t: "decision", v: 2, judgmentId: "j_missing", ts: 1, reflex: "gate", action: "auto", reasons: [] },
-    ];
+    const events: JournalEvent[] = [{ t: "decision", v: 2, judgmentId: "j_missing", ts: 1, reflex: "gate", action: "auto", reasons: [] }];
     const report = replayJournal(events, policyForTrust(0.3));
     expect(report.total).toBe(0);
     expect(report.unsupported).toBe(1);

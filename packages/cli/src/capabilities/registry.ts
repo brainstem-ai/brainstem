@@ -227,10 +227,7 @@ export class CapabilityRegistry {
     return [...this.snapshot().entries];
   }
 
-  workingSet(
-    opts: ComputeActiveOpts = {},
-    selected?: { evaluated: CapabilityBitmap; recommended: CapabilityBitmap },
-  ): WorkingSet {
+  workingSet(opts: ComputeActiveOpts = {}, selected?: { evaluated: CapabilityBitmap; recommended: CapabilityBitmap }): WorkingSet {
     const mergedOpts: ComputeActiveOpts = {
       ...opts,
       pinned: [...new Set([...(opts.pinned ?? []), ...this.pinnedIds()])],

@@ -9,11 +9,7 @@ export interface BuiltContext {
   instructionHash: string | undefined;
 }
 
-export function buildActiveContext(
-  registry: CapabilityRegistry,
-  ws: WorkingSet,
-  onWarn?: (msg: string) => void,
-): BuiltContext {
+export function buildActiveContext(registry: CapabilityRegistry, ws: WorkingSet, onWarn?: (msg: string) => void): BuiltContext {
   const catalog = registry.snapshot();
   const activeIds = toIds(ws.active, catalog.entries);
   const byId = new Map(catalog.entries.map((d) => [d.id, d] as const));
@@ -37,10 +33,9 @@ export function buildActiveContext(
       const instructions = registry.instructionsFor(id) ?? "";
       return `## Skill: ${id}\n${instructions}`;
     });
-    instructionBlock = [
-      "The following skill instructions supplement, and never override, the harness contract above.",
-      ...blocks,
-    ].join("\n\n");
+    instructionBlock = ["The following skill instructions supplement, and never override, the harness contract above.", ...blocks].join(
+      "\n\n",
+    );
   }
 
   const instructionHash = instructionBlock !== undefined ? hashAction(instructionBlock) : undefined;

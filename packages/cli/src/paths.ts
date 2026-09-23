@@ -3,7 +3,15 @@ import { chmodSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writ
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
-import { contentHash, expandHome, isInside, normalizeAbsolute, realpathIfExists, resolveParentForWrite, resolvePath } from "@brainstem/core";
+import {
+  contentHash,
+  expandHome,
+  isInside,
+  normalizeAbsolute,
+  realpathIfExists,
+  resolveParentForWrite,
+  resolvePath,
+} from "@brainstem/core";
 
 // The canonical path resolvers live in @brainstem/core/paths.ts so that
 // packages/core/src/floor.ts (policy) and this module (execution) share one

@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "plugins": ["oxc", "typescript"],
+  "rules": {
+    "no-control-regex": "off",
+    "no-unused-vars": "off"
+  }
+}

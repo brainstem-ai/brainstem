@@ -212,10 +212,7 @@ describe("R4: managed process group termination", () => {
     if (!hasPython3) return; // environment without python3: nothing to detach with, skip rather than false-fail
 
     dir = mkdtempSync(join(tmpdir(), "brainstem-tools-r4-"));
-    writeFileSync(
-      join(dir, "detach.py"),
-      "import os,time\nos.setsid()\ntime.sleep(1.0)\n",
-    );
+    writeFileSync(join(dir, "detach.py"), "import os,time\nos.setsid()\ntime.sleep(1.0)\n");
     const bash = makeTools({ cwd: dir, killGraceMs: 50, drainGraceMs: 20 }).find((t) => t.name === "bash")!;
     const started = performance.now();
     const result = (await bash.execute("drain", { command: "python3 detach.py & wait", timeout_ms: 200 })) as {

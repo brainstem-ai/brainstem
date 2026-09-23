@@ -94,9 +94,9 @@ describe("CapabilityRegistry", () => {
   test("rejects unknown ids in explicit selection and duplicate registration", () => {
     const registry = new CapabilityRegistry();
     expect(() => registry.setExplicit(["tool:nope"])).toThrow(/unknown capability/);
-    expect(() =>
-      registry.register({ id: "tool:bash", kind: "tool", version: "1", description: "dup" }, null),
-    ).toThrow(/already registered/);
+    expect(() => registry.register({ id: "tool:bash", kind: "tool", version: "1", description: "dup" }, null)).toThrow(
+      /already registered/,
+    );
   });
 
   test("attachImpl throws on unknown id, double attach, and is visible via impl", () => {
@@ -140,10 +140,7 @@ describe("CapabilityRegistry", () => {
 
   test("workingSet merges registry pins into computeActive opts", () => {
     const registry = new CapabilityRegistry();
-    registry.register(
-      { id: "skill:extra", kind: "skill", version: "1", description: "extra", alwaysAvailable: false },
-      null,
-    );
+    registry.register({ id: "skill:extra", kind: "skill", version: "1", description: "extra", alwaysAvailable: false }, null);
     registry.pin(["skill:extra"]);
     const ws = registry.workingSet();
     expect(toIds(ws.active, registry.snapshot().entries)).toContain("skill:extra");

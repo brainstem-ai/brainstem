@@ -8,10 +8,7 @@ import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { choiceAnswer, mockSystemOne, noulAnswer, scoreAnswer, type Answer, type Question } from "@brainstem/core";
 import { createHarness } from "../src/harness";
 
-function assistantMessage(
-  content: AssistantMessage["content"],
-  stopReason: AssistantMessage["stopReason"],
-): AssistantMessage {
+function assistantMessage(content: AssistantMessage["content"], stopReason: AssistantMessage["stopReason"]): AssistantMessage {
   return {
     role: "assistant",
     content,
@@ -141,7 +138,14 @@ describe("Focus rollout integration", () => {
       systemOne: mock,
       streamFn: scriptedStream([
         assistantMessage(
-          [{ type: "toolCall", id: "tc1", name: "bash", arguments: { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` } }],
+          [
+            {
+              type: "toolCall",
+              id: "tc1",
+              name: "bash",
+              arguments: { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` },
+            },
+          ],
           "toolUse",
         ),
         assistantMessage([{ type: "text", text: "done" }], "stop"),
@@ -189,7 +193,14 @@ describe("Focus rollout integration", () => {
       systemOne: mock,
       streamFn: scriptedStream([
         assistantMessage(
-          [{ type: "toolCall", id: "tc1", name: "bash", arguments: { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` } }],
+          [
+            {
+              type: "toolCall",
+              id: "tc1",
+              name: "bash",
+              arguments: { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` },
+            },
+          ],
           "toolUse",
         ),
         assistantMessage([{ type: "text", text: "done" }], "stop"),
@@ -278,11 +289,7 @@ describe("Focus rollout integration", () => {
     const stream: StreamFn = (model, context, opts) => {
       step += 1;
       if (step === 1) {
-        return toolCallStep("tc1", "bash", { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` })(
-          model,
-          context,
-          opts,
-        );
+        return toolCallStep("tc1", "bash", { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` })(model, context, opts);
       }
       if (step === 2) {
         const id = artifactIdFor(journalPath, "tc1");
@@ -338,7 +345,14 @@ describe("Focus rollout integration", () => {
       systemOne: mock,
       streamFn: scriptedStream([
         assistantMessage(
-          [{ type: "toolCall", id: "tc1", name: "bash", arguments: { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` } }],
+          [
+            {
+              type: "toolCall",
+              id: "tc1",
+              name: "bash",
+              arguments: { command: `printf '${THREE_SECTION_OUTPUT.replace(/\n/g, "\\n")}\\n'` },
+            },
+          ],
           "toolUse",
         ),
         assistantMessage([{ type: "text", text: "done" }], "stop"),

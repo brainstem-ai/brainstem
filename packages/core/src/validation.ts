@@ -73,10 +73,7 @@ function validateAnswer(id: string, question: Question, answer: unknown): Answer
   return chosen;
 }
 
-export function validateAnswers(
-  questions: Record<string, Question>,
-  rawAnswers: Record<string, unknown>,
-): Record<string, Answer> {
+export function validateAnswers(questions: Record<string, Question>, rawAnswers: Record<string, unknown>): Record<string, Answer> {
   const answers: Record<string, Answer> = {};
   for (const id of Object.keys(questions)) {
     answers[id] = validateAnswer(id, questions[id]!, rawAnswers[id]);
