@@ -3,6 +3,12 @@
     "target": "ES2022",
     "module": "Preserve",
     "moduleResolution": "bundler",
+    "paths": {
+      "@brainstem/core": ["./packages/core/src/index.ts"],
+      "@brainstem/pi-adapter": ["./packages/pi-adapter/src/index.ts"],
+      "@brainstem/reflexes": ["./packages/reflexes/src/index.ts"],
+      "@brainstem/reflexes/*": ["./packages/reflexes/src/*"]
+    },
     "types": ["bun"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -10,5 +16,5 @@
     "noEmit": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["experiments", "packages/*/src", "packages/*/test", "vitest.config.ts"]
+  "include": ["experiments", "packages/*/src", "packages/*/test", "tsdown.config.ts", "vitest.config.ts"]
 }

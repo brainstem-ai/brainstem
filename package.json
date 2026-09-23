@@ -2,6 +2,7 @@
   "name": "brainstem",
   "private": true,
   "packageManager": "bun@1.4.2",
+  "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
     "exp:access": "bun run experiments/01-access.ts",
@@ -15,6 +16,7 @@
     "eval:select-ambiguity": "bun run experiments/evals/select-ambiguity.ts",
     "eval:with-without": "bun run experiments/evals/with-without-harness.ts",
     "eval:focus-vs-rtk": "bun run experiments/evals/focus-vs-rtk.ts",
+    "build": "tsdown",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/typecheck.tsbuildinfo -p tsconfig.json"
   },
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@types/bun": "1.4.2",
+    "tsdown": "0.23.0",
     "typescript": "7.0.2",
     "vitest": "^3.2.0"
   },

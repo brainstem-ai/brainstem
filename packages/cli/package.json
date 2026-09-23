@@ -2,13 +2,20 @@
   "name": "@brainstem/cli",
   "version": "0.1.0",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "../../node_modules/.bin/tsdown --config ../../tsdown.config.ts --filter cli"
+  },
   "bin": {
-    "brainstem": "./src/main.ts"
+    "brainstem": "./dist/main.mjs"
   },
   "dependencies": {
     "@brainstem/core": "workspace:*",
     "@earendil-works/pi-agent-core": "0.86.1",
     "@earendil-works/pi-ai": "0.86.1",
-    "@sinclair/typebox": "0.34.52"
+    "@sinclair/typebox": "0.34.52",
+    "@typesafe-ai/sdk": "^0.6.0"
   }
 }
