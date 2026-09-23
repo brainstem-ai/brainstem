@@ -19,9 +19,10 @@
     "eval:with-without": "bun run experiments/evals/with-without-harness.ts",
     "eval:focus-vs-rtk": "bun run experiments/evals/focus-vs-rtk.ts",
     "build": "tsdown",
+    "build:check": "tsdown --config tsdown.check.config.ts",
     "format": "oxfmt --write \"packages/**/*.ts\" \"packages/*/package.json\" \"experiments/**/*.ts\" \"*.ts\" \"*.json\" \".ox*.json\"",
     "format:check": "oxfmt --check \"packages/**/*.ts\" \"packages/*/package.json\" \"experiments/**/*.ts\" \"*.ts\" \"*.json\" \".ox*.json\"",
-    "lint": "oxlint --deny-warnings packages experiments tsdown.config.ts vitest.config.ts",
+    "lint": "oxlint --deny-warnings packages experiments tsdown.config.ts tsdown.check.config.ts vitest.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/typecheck.tsbuildinfo -p tsconfig.json"
   },
@@ -29,9 +30,11 @@
     "@typesafe-ai/sdk": "^0.6.0"
   },
   "devDependencies": {
+    "@arethetypeswrong/core": "0.18.5",
     "@types/bun": "1.4.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.83.0",
+    "publint": "0.3.24",
     "tsdown": "0.23.0",
     "typescript": "7.0.2",
     "vitest": "^3.2.0"

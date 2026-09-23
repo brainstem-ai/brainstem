@@ -11,7 +11,7 @@ const library: UserConfig = {
   tsconfig: "tsconfig.build.json",
 };
 
-export default defineConfig([
+export const buildConfigs: UserConfig[] = [
   {
     ...library,
     cwd: "packages/core",
@@ -38,4 +38,6 @@ export default defineConfig([
     entry: "src/main.ts",
     name: "cli",
   },
-]);
+];
+
+export default defineConfig(buildConfigs);
